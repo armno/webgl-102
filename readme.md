@@ -31,27 +31,27 @@ Then create `webpack.config.js` file.
 const path = require('path');
 
 module.exports = {
-	mode: 'development',
-	entry: './src/main.ts',
-	output: {
-		filename: 'main.js',
-		path: path.resolve(__dirname, 'dist')
-	},
-	devServer: {
-		contentBase: './src'
-	},
-	resolve: {
-		extensions: ['.ts', '.tsx', '.js', '.jsx']
-	},
-	devtool: 'source-map',
-	module: {
-		rules: [
-			{
-				test: /\.tsx?$/,
-				loader: 'awesome-typescript-loader'
-			}
-		]
-	}
+  mode: 'development',
+  entry: './src/main.ts',
+  output: {
+    filename: 'main.js',
+    path: path.resolve(__dirname, 'dist')
+  },
+  devServer: {
+    contentBase: './src'
+  },
+  resolve: {
+    extensions: ['.ts', '.tsx', '.js', '.jsx']
+  },
+  devtool: 'source-map',
+  module: {
+    rules: [
+      {
+        test: /\.tsx?$/,
+        loader: 'awesome-typescript-loader'
+      }
+    ]
+  }
 };
 ```
 
@@ -63,11 +63,11 @@ Next is to create `tsconfig.json`
 
 ```json
 {
-	"compilerOptions": {
-		"allowJs": true,
-		"target": "es5",
-		"noImplicitAny": true
-	}
+  "compilerOptions": {
+    "allowJs": true,
+    "target": "es5",
+    "noImplicitAny": true
+  }
 }
 ```
 
@@ -125,12 +125,12 @@ In this case, we can do nothing but stop continuing.
 ```ts
 let gl = canvas.getContext('webgl');
 if (!gl) {
-	gl = canvas.getContext('experimental-webgl');
+  gl = canvas.getContext('experimental-webgl');
 }
 
 if (!gl) {
-	console.warn('WebGL is not supported in your browser.');
-	return;
+  console.warn('WebGL is not supported in your browser.');
+  return;
 }
 ```
 
