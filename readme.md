@@ -1,6 +1,7 @@
 # webgl-102
 
-Learning WebGL with [WebGL Tutorials by Indigo Code](https://www.youtube.com/watch?v=kB0ZVUrI4Aw&list=PLjcVFFANLS5zH_PeKC6I8p0Pt1hzph_rt) on Youtube.
+Learning WebGL with [WebGL Tutorials by Indigo Code](https://www.youtube.com/watch?v=kB0ZVUrI4Aw&list=PLjcVFFANLS5zH_PeKC6I8p0Pt1hzph_rt) on Youtube,
+in combination with [Getting Started with WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Getting_started_with_WebGL) tutorials on MDN.
 
 Here are my notes during learning.
 
@@ -97,3 +98,50 @@ $ npx webpack-dev-server --open
 The dev URL is at `http://localhost:8080/`.
 
 ---
+
+## Step 1: Draw something
+
+WebGL is draw in a `<canvas>` element. So we create it in the HTML page.
+
+```html
+<canvas id="webgl-102" width="800" height="600"></canvas>
+```
+
+In TS code, get WebGL context from the canvas element.
+
+```ts
+const canvas = <HTMLCanvasElement>document.getElementById('webgl-102');
+const gl = canvas.getContext('webgl');
+```
+
+### Checking if the browser support WebGL
+
+It is also a good idea to handle fallback for older browsers.
+On IE11, Edge, and some Android browsers, we have to get the context using `experimental-webgl` instead.
+
+If we still cannot get the context from `experimental-webgl`, then the user is using a browser that doesn't support WebGL.
+In this case, we can do nothing but stop continuing.
+
+```ts
+let gl = canvas.getContext('webgl');
+if (!gl) {
+	gl = canvas.getContext('experimental-webgl');
+}
+
+if (!gl) {
+	console.warn('WebGL is not supported in your browser.');
+	return;
+}
+```
+
+### Drawing the canvas
+
+```ts
+gl.clearColor(0.75, 0.85, 0.8, 1);
+gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+```
+
+- `.clearColor(R, G, B, A)` - specify the color to use with `.clear()` method. This doesn't draw anything yet. It just sets the color.
+- `.clear(mask)` - _clears_ buffers to the preset value. `mask` argument indicates buffers to be cleared. In the code abover, we clear both color buffer and depth buffer.
+  - `COLOR_BUFFER_BIT` specifies the color of a pixel
+  - `DEPTH_BUFFER_BIT` specifies the depth of a pixel - how far is the pixel.
