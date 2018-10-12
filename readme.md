@@ -17,12 +17,12 @@ Start by install dev-dependencies.
 
 ```sh
 $ npm install --save-dev \
-		typescript \
-		awesome-typescript-loader \
-		source-map-loader \
-		webpack \
-		webpack-cli \
-		webpack-dev-server
+    typescript \
+    awesome-typescript-loader \
+    source-map-loader \
+    webpack \
+    webpack-cli \
+    webpack-dev-server
 ```
 
 Then create `webpack.config.js` file.
@@ -78,13 +78,13 @@ but webpack-dev-server will take care of it.
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta http-equiv="X-UA-Compatible" content="ie=edge">
-	<title>WebGL 102</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>WebGL 102</title>
 </head>
 <body>
-	<script src="main.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
 ```
@@ -168,7 +168,7 @@ precision mediump float;
 attribute vec2 vertPosition;
 
 void main() {
-	gl_Position = vec4(vertPosition, 0.0, 1.0);
+  gl_Position = vec4(vertPosition, 0.0, 1.0);
 }
 ```
 
@@ -178,7 +178,7 @@ An example of a fragment shader
 precision mediump float;
 
 void main() {
-	gl_FragColor = vec4(1.0, 0.3, 0.0, 1.0);
+  gl_FragColor = vec4(1.0, 0.3, 0.0, 1.0);
 }
 ```
 
