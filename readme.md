@@ -1,6 +1,6 @@
 # webgl-102
 
-Learning WebGL with [WebGL Tutorials by Indigo Code](https://www.youtube.com/watch?v=kB0ZVUrI4Aw&list=PLjcVFFANLS5zH_PeKC6I8p0Pt1hzph_rt) on Youtube,
+Learning WebGL with [WebGL Tutorials by Indigo Code](https://www.youtube.com/watch?v=kB0ZVUrI4Aw&list=PLjcVFFANLS5zH_PeKC6I8p0Pt1hzph_rt) on Youtube (highly recommended. really good!)
 in combination with [Getting Started with WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Getting_started_with_WebGL) tutorials on MDN.
 
 Here are my notes during learning.
@@ -145,3 +145,41 @@ gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 - `.clear(mask)` - _clears_ buffers to the preset value. `mask` argument indicates buffers to be cleared. In the code abover, we clear both color buffer and depth buffer.
   - `COLOR_BUFFER_BIT` specifies the color of a pixel
   - `DEPTH_BUFFER_BIT` specifies the depth of a pixel - how far is the pixel.
+
+Refresh the browser, the canvas should be on the screen.
+
+![first canvas drawn with WebGL](docs/01-first-canvas.png)
+
+---
+
+## Step 2: Shaders
+
+- A shader is a program that runs on the GPU
+- It is written in the OpenGL ES Shading Language (GLSL)
+- It needs to be compiled for execution on the GPU
+- A Vertex Shader is a shader that takes care of each vertex (each point) in the shape by setting position of the vertext in WebGL coordinates system.
+- A Fragment Shader is a shader that is called once for each pixel on the shape by setting the color of the pixel to put on the screen.
+
+An example of a vertex shader
+
+```
+precision mediump float;
+
+attribute vec2 vertPosition;
+
+void main() {
+	gl_Position = vec4(vertPosition, 0.0, 1.0);
+}
+```
+
+An example of a fragment shader
+
+```
+precision mediump float;
+
+void main() {
+	gl_FragColor = vec4(1.0, 0.3, 0.0, 1.0);
+}
+```
+
+To be continued. For now, see [`app.ts`](./src/app.ts) for inline notes.
