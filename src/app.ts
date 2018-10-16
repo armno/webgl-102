@@ -397,6 +397,10 @@ export class App {
     );
 
     const worldMatrix = new Float32Array(16);
+    const xRotationMatrix = new Float32Array(16);
+    const yRotationMatrix = new Float32Array(16);
+    const zRotationMatrix = new Float32Array(16);
+    const intermediateRotationMatrix = new Float32Array(16);
 
     // pass on matices to the shaders
     // "uniform matrix with 4 points, floats, and whatever v is"
@@ -408,7 +412,9 @@ export class App {
     // update worldMatrix every frame
     let angle = 0;
     const identityMatrix = mat4.create();
+    const xAxis = [1, 0, 0];
     const yAxis = [0, 1, 0];
+    const zAxis = [0, 0, 1];
     const intervalInSeconds = 10;
 
     function render() {
@@ -419,7 +425,27 @@ export class App {
       angle = (performance.now() / 1000 / intervalInSeconds) * 2 * Math.PI;
 
       // rotate the worldMatrix, by identityMatrix, by `angle` each time, around `yAxis`
-      mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, yAxis);
+      // mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, yAxis);
+
+      // create 3 rotation matrices for each axis
+      mat4.rotate(<mat4>xRotationMatrix, identityMatrix, angle, xAxis);
+      mat4.rotate(<mat4>yRotationMatrix, identityMatrix, angle / 4, yAxis);
+      mat4.rotate(<mat4>zRotationMatrix, identityMatrix, angle, zAxis);
+
+      // `mat4.multiply` accepts only 2 parameters so i create an intermediate matrix
+      // to rotate x and y axis first, then combine with z axis rotation later
+      mat4.multiply(
+        <mat4>intermediateRotationMatrix,
+        <mat4>xRotationMatrix,
+        <mat4>yRotationMatrix
+      );
+
+      // multiply 3 rotation matrices into the worldMatrix
+      mat4.multiply(
+        <mat4>worldMatrix,
+        <mat4>zRotationMatrix,
+        <mat4>intermediateRotationMatrix
+      );
 
       // send the updated worldMatrix to the GPU
       this.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
@@ -464,9 +490,19 @@ export class App {
      * the green face always is on the top of everything
      * because we didn't do the "depth test" of each face before drawing it.
      *
-     * gl.enable(gl.DEPTH_TEST)
+     * gl.enable(gl.DEPTH_TEST);
      *
+     * we should also enable CULL_FACE to prevent opengl to do calculations
+     * for faces that are not visible to the user - faces in the back
      *
+     * gl.enable(gl.CULL_FACE);
+     */
+
+    /**
+     * Part 3 - Rotating the Cube in multiple axis
+     *
+     * to rotate an object in multiple axis, we will need to create 1 rotation matrix
+     * for each direction to rotate, and multiply them together
      */
   }
 
