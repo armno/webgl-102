@@ -139,26 +139,119 @@ export class App {
 			 0.0, 0.5, 0.0,     1.0, 0.2, 0.0,
 			-0.5, -0.5, 0.0,    0.8, 0.5, 0.7,
 			 0.5, -0.5, 0.0,    0.0, 0.3, 0.9
-			];
+      ];
+
+    // @see Part 2.5
+    // 6 faces of the cube. each face has 4 points
+    // prettier-ignore
+    const boxVertices =
+    [ // X, Y, Z           R, G, B
+      // Top
+      -1.0, 1.0, -1.0,   0.5, 0.5, 0.5,
+      -1.0, 1.0, 1.0,    0.5, 0.5, 0.5,
+      1.0, 1.0, 1.0,     0.5, 0.5, 0.5,
+      1.0, 1.0, -1.0,    0.5, 0.5, 0.5,
+
+      // Left
+      -1.0, 1.0, 1.0,    0.75, 0.25, 0.5,
+      -1.0, -1.0, 1.0,   0.75, 0.25, 0.5,
+      -1.0, -1.0, -1.0,  0.75, 0.25, 0.5,
+      -1.0, 1.0, -1.0,   0.75, 0.25, 0.5,
+
+      // Right
+      1.0, 1.0, 1.0,    0.25, 0.25, 0.75,
+      1.0, -1.0, 1.0,   0.25, 0.25, 0.75,
+      1.0, -1.0, -1.0,  0.25, 0.25, 0.75,
+      1.0, 1.0, -1.0,   0.25, 0.25, 0.75,
+
+      // Front
+      1.0, 1.0, 1.0,    1.0, 0.2, 0.15,
+      1.0, -1.0, 1.0,    1.0, 0.2, 0.15,
+      -1.0, -1.0, 1.0,    1.0, 0.2, 0.15,
+      -1.0, 1.0, 1.0,    1.0, 0.2, 0.15,
+
+      // Back
+      1.0, 1.0, -1.0,     0.1, 0.8, 0.15,
+      1.0, -1.0, -1.0,    0.1, 0.8, 0.15,
+      -1.0, -1.0, -1.0,   0.1, 0.8, 0.15,
+      -1.0, 1.0, -1.0,    0.1, 0.8, 0.15,
+
+      // Bottom
+      -1.0, -1.0, -1.0,   0.5, 0.5, 1.0,
+      -1.0, -1.0, 1.0,    0.5, 0.5, 1.0,
+      1.0, -1.0, 1.0,     0.5, 0.5, 1.0,
+      1.0, -1.0, -1.0,    0.5, 0.5, 1.0,
+    ];
+
+    // index array - this tells which points to use for each cube face
+    // prettier-ignore
+    const boxIndices =
+      [
+        // Top
+        0, 1, 2,
+        0, 2, 3,
+
+        // Left
+        5, 4, 6,
+        6, 4, 7,
+
+        // Right
+        8, 9, 10,
+        8, 10, 11,
+
+        // Front
+        13, 12, 14,
+        15, 14, 12,
+
+        // Back
+        16, 17, 18,
+        16, 18, 19,
+
+        // Bottom
+        21, 20, 22,
+        22, 20, 23
+      ];
 
     // `vertices` is an array of numbers lives on the CPU (browser),
     // the GPU will not understand this format.
     // we need to convert this array into a "buffer" - something the GPU can understand
 
     // by creating a buffer, we allocate some memory in the GPU
-    const triangleBuffer = this.gl.createBuffer();
+    // const triangleBuffer = this.gl.createBuffer();
+
+    // part 2.5: create box buffer instead of triangle buffers
+    const boxVertexBufferObject = this.gl.createBuffer();
 
     // then we bind the `vertices` array to the created buffer
     // we want to use ARRAY_BUFFER as a "target"
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, triangleBuffer);
+    // this.gl.bindBuffer(this.gl.ARRAY_BUFFER, triangleBuffer);
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, boxVertexBufferObject);
 
     // specify data for the buffer
     // - target use ARRAY_BUFFER as the target
     // - data: convert `vertices` array to something that works with opengl - the Float32Array
     // - usage: tell opengl that the `data` will not change after it is used
+    // this.gl.bufferData(
+    //   this.gl.ARRAY_BUFFER,
+    //   new Float32Array(vertices),
+    //   this.gl.STATIC_DRAW
+    // );
     this.gl.bufferData(
       this.gl.ARRAY_BUFFER,
-      new Float32Array(vertices),
+      new Float32Array(boxVertices),
+      this.gl.STATIC_DRAW
+    );
+
+    // part 2.5
+    // we create another buffer for index array
+    // for index array, we use gl.ELEMENT_ARRAY_BUFFER instead
+    // also, data source is now `Uinit16Array` because index array contains
+    // values of unsigned integers instead of floats
+    const boxIndexBufferObject = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, boxIndexBufferObject);
+    this.gl.bufferData(
+      this.gl.ELEMENT_ARRAY_BUFFER,
+      new Uint16Array(boxIndices),
       this.gl.STATIC_DRAW
     );
 
@@ -203,6 +296,15 @@ export class App {
     // enable attributes
     this.gl.enableVertexAttribArray(positionAttributeLocation);
     this.gl.enableVertexAttribArray(colorAttributeLocation);
+    this.gl.enable(this.gl.DEPTH_TEST);
+
+    // part 2.5 - enable CULL_FACE to prevent opengl to do all calculations
+    // for faces in the back, which are not visible to the user.
+    this.gl.enable(this.gl.CULL_FACE);
+
+    // tell webgl which face is the front face and the cull face
+    this.gl.frontFace(this.gl.CCW);
+    this.gl.cullFace(this.gl.BACK);
 
     // -----
 
@@ -275,7 +377,7 @@ export class App {
 
     // set positions in 3d space
     const viewMatrix = new Float32Array(16);
-    const eyePosition = [0, 0, -3];
+    const eyePosition = [0, 0, -8];
     const centerPosition = [0, 0, 0];
     const upPosition = [0, 1, 0];
     mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
@@ -307,24 +409,65 @@ export class App {
     let angle = 0;
     const identityMatrix = mat4.create();
     const yAxis = [0, 1, 0];
-    const intervalInSeconds = 3;
+    const intervalInSeconds = 10;
+
     function render() {
       // performance.now() returns relative time in ms since page loads
       // ` / 1000` to convert from ms to seconds
       // ` / 6` to get value of angle to increase per each frame
       // result = 1 full rotation every 6 seconds
       angle = (performance.now() / 1000 / intervalInSeconds) * 2 * Math.PI;
+
+      // rotate the worldMatrix, by identityMatrix, by `angle` each time, around `yAxis`
       mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, yAxis);
 
-      // send worldMatrix to the GPU
+      // send the updated worldMatrix to the GPU
       this.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
 
       this.clearScreen();
-      this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
+      // this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
+
+      // part 2.5 - instead of using `drawArrays`, we use `drawElements`
+      // from the index array with `UNSIGNED_SHORT` data type
+      this.gl.drawElements(
+        this.gl.TRIANGLES,
+        boxIndices.length,
+        this.gl.UNSIGNED_SHORT,
+        0
+      );
 
       requestAnimationFrame(render.bind(this));
     }
+
     requestAnimationFrame(render.bind(this));
+
+    // -----
+
+    /**
+     * Part 2.5
+     *
+     * in order to create a cube from triangles, we have to create 2 vertexes
+     * for each face on the cube: 2 triangles combined into 1 rectangle.
+     * the cube has 6 faces will end up with 12 vertexes
+     * that's 12 * 6 = 72 points to define in the `vertices` array!
+     * and there will be many duplicated points in the array
+     * as each corner of the cube shares the same coordinates.
+
+     * so we will instead create only 4 points instead of 6 points in a vertex
+     * and introduce another array of `indexes` to tell webgl
+     * which points to use to create each face of the cube.
+     *
+     * @see `boxVertices` and `boxIndices` below `vertices` array declaration
+     * as well as the updated `render` function.
+     *
+     * at this point, the cube is draw and it is rotating, but doesn't look quite correct yet.
+     * the green face always is on the top of everything
+     * because we didn't do the "depth test" of each face before drawing it.
+     *
+     * gl.enable(gl.DEPTH_TEST)
+     *
+     *
+     */
   }
 
   clearScreen() {
