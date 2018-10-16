@@ -36,15 +36,19 @@ export class App {
 		precision mediump float;
 
 		attribute vec3 vertPosition;
-		attribute vec3 vertColor;
+    // attribute vec3 vertColor;
+    attribute vec2 vertTexCoord;
 
-    varying vec3 fragColor;
+    // varying vec3 fragColor;
+    varying vec2 fragTexCoord;
+
     uniform mat4 mWorld;
     uniform mat4 mView;
     uniform mat4 mProj;
 
 		void main() {
-			fragColor = vertColor;
+      // fragColor = vertColor;
+      fragTexCoord = vertTexCoord;
       gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);
 		}
 		`;
@@ -52,10 +56,13 @@ export class App {
     const fs = `
 		precision mediump float;
 
-		varying vec3 fragColor;
+    // varying vec3 fragColor;
+    varying vec2 fragTexCoord;
+    uniform sampler2D sampler;
 
 		void main() {
-			gl_FragColor = vec4(fragColor, 1.0);
+      // gl_FragColor = vec4(fragColor, 1.0);
+      gl_FragColor = texture2D(sampler, fragTexCoord);
 		}
 		`;
 
@@ -145,42 +152,42 @@ export class App {
     // 6 faces of the cube. each face has 4 points
     // prettier-ignore
     const boxVertices =
-    [ // X, Y, Z           R, G, B
+    [ // X, Y, Z         U, V
       // Top
-      -1.0, 1.0, -1.0,   0.5, 0.2, 0.5,
-      -1.0, 1.0, 1.0,    0.7, 0.2, 0.1,
-      1.0, 1.0, 1.0,     0.3, 0.5, 0.3,
-      1.0, 1.0, -1.0,    0.1, 0.3, 0.6,
+      -1.0, 1.0, -1.0,   0, 0,
+      -1.0, 1.0, 1.0,    0, 1,
+      1.0, 1.0, 1.0,     1, 1,
+      1.0, 1.0, -1.0,    1, 0,
 
       // Left
-      -1.0, 1.0, 1.0,    0.75, 0.25, 0.5,
-      -1.0, -1.0, 1.0,   0.75, 0.25, 0.5,
-      -1.0, -1.0, -1.0,  0.75, 0.25, 0.5,
-      -1.0, 1.0, -1.0,   0.75, 0.25, 0.5,
+      -1.0, 1.0, 1.0,    0, 0,
+      -1.0, -1.0, 1.0,   0, 1,
+      -1.0, -1.0, -1.0,  1, 1,
+      -1.0, 1.0, -1.0,   1, 0,
 
       // Right
-      1.0, 1.0, 1.0,    0.25, 0.25, 0.75,
-      1.0, -1.0, 1.0,   0.25, 0.25, 0.75,
-      1.0, -1.0, -1.0,  0.25, 0.25, 0.75,
-      1.0, 1.0, -1.0,   0.25, 0.25, 0.75,
+      1.0, 1.0, 1.0,     0, 0,
+      1.0, -1.0, 1.0,    1, 0,
+      1.0, -1.0, -1.0,   1, 1,
+      1.0, 1.0, -1.0,    0, 1,
 
       // Front
-      1.0, 1.0, 1.0,    1.0, 0.2, 0.15,
-      1.0, -1.0, 1.0,    1.0, 0.2, 0.15,
-      -1.0, -1.0, 1.0,    1.0, 0.2, 0.15,
-      -1.0, 1.0, 1.0,    1.0, 0.2, 0.15,
+      1.0, 1.0, 1.0,     1, 1,
+      1.0, -1.0, 1.0,    1, 0,
+      -1.0, -1.0, 1.0,   0, 0,
+      -1.0, 1.0, 1.0,    0, 1,
 
       // Back
-      1.0, 1.0, -1.0,     0.1, 0.8, 0.15,
-      1.0, -1.0, -1.0,    0.1, 0.8, 0.15,
-      -1.0, -1.0, -1.0,   0.1, 0.8, 0.15,
-      -1.0, 1.0, -1.0,    0.1, 0.8, 0.15,
+      1.0, 1.0, -1.0,     0, 0,
+      1.0, -1.0, -1.0,    0, 1,
+      -1.0, -1.0, -1.0,   1, 1,
+      -1.0, 1.0, -1.0,    1, 0,
 
       // Bottom
-      -1.0, -1.0, -1.0,   0.5, 0.5, 1.0,
-      -1.0, -1.0, 1.0,    0.5, 0.5, 1.0,
-      1.0, -1.0, 1.0,     0.5, 0.5, 1.0,
-      1.0, -1.0, -1.0,    0.5, 0.5, 1.0,
+      -1.0, -1.0, -1.0,   0, 0,
+      -1.0, -1.0, 1.0,    0, 1,
+      1.0, -1.0, 1.0,     0, 0,
+      1.0, -1.0, -1.0,    1, 1
     ];
 
     // index array - this tells which points to use for each cube face
@@ -272,6 +279,11 @@ export class App {
       'vertColor'
     );
 
+    const textureAttributeLocation = this.gl.getAttribLocation(
+      program,
+      'vertTexCoord'
+    );
+
     // here comes a monster method
     // prettier-ignore
     this.gl.vertexAttribPointer(
@@ -279,23 +291,28 @@ export class App {
 			3, // number of elements (floats) per attribute
 			this.gl.FLOAT, // type of elements
 			false, // dont normalize - note: there is no gl.FALSE
-			6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex
+      // 6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex
+      5 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
 			0 // offset from the beginning of a single vertex to this attribute
 		);
 
     // prettier-ignore
     this.gl.vertexAttribPointer(
-			colorAttributeLocation, // now we use the color attribute
-			3, // for colors we have R,G,B values so it's 3
+      // colorAttributeLocation, // now we use the color attribute
+      textureAttributeLocation,
+      // 3, // for colors we have R,G,B values so it's 3
+      2, // u and v in texture coords
 			this.gl.FLOAT, // we still use floats here
 			false, // nope
-			6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex (same as positionAttributeLocation)
+			// 6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex (same as positionAttributeLocation)
+			5 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
 			3 * Float32Array.BYTES_PER_ELEMENT // offset: 2 from the beginning of each vertex
 		)
 
     // enable attributes
     this.gl.enableVertexAttribArray(positionAttributeLocation);
-    this.gl.enableVertexAttribArray(colorAttributeLocation);
+    // this.gl.enableVertexAttribArray(colorAttributeLocation);
+    this.gl.enableVertexAttribArray(textureAttributeLocation);
     this.gl.enable(this.gl.DEPTH_TEST);
 
     // part 2.5 - enable CULL_FACE to prevent opengl to do all calculations
@@ -307,6 +324,47 @@ export class App {
     this.gl.cullFace(this.gl.BACK);
 
     // -----
+
+    // Create texture
+    const wallTexture = this.gl.createTexture();
+    this.gl.bindTexture(this.gl.TEXTURE_2D, wallTexture);
+
+    // opengl uses `S` and `T` instead of `U` and `V` respectively
+    this.gl.texParameteri(
+      this.gl.TEXTURE_2D,
+      this.gl.TEXTURE_WRAP_S,
+      this.gl.CLAMP_TO_EDGE
+    );
+    this.gl.texParameteri(
+      this.gl.TEXTURE_2D,
+      this.gl.TEXTURE_WRAP_T,
+      this.gl.CLAMP_TO_EDGE
+    );
+
+    // sampling
+    this.gl.texParameteri(
+      this.gl.TEXTURE_2D,
+      this.gl.TEXTURE_MIN_FILTER,
+      this.gl.LINEAR
+    );
+    this.gl.texParameteri(
+      this.gl.TEXTURE_2D,
+      this.gl.TEXTURE_MAG_FILTER,
+      this.gl.LINEAR
+    );
+
+    // load the texture, for real
+    this.gl.texImage2D(
+      this.gl.TEXTURE_2D,
+      0,
+      this.gl.RGBA,
+      this.gl.RGBA,
+      this.gl.UNSIGNED_BYTE,
+      <TexImageSource>document.getElementById('wall-texture')
+    );
+
+    // unbind the texture to save up some memory
+    this.gl.bindTexture(this.gl.TEXTURE_2D, null);
 
     // main render loop
     this.gl.useProgram(program);
@@ -412,9 +470,9 @@ export class App {
     // update worldMatrix every frame
     let angle = 0;
     const identityMatrix = mat4.create();
-    // const xAxis = [1, 0, 0];
+    const xAxis = [1, 0, 0];
     const yAxis = [0, 1, 0];
-    const intervalInSeconds = 5;
+    const intervalInSeconds = 10;
 
     function render() {
       // performance.now() returns relative time in ms since page loads
@@ -427,16 +485,18 @@ export class App {
       // mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, yAxis);
 
       // create 2 rotation matrices for each axis
-      // mat4.rotate(<mat4>xRotationMatrix, identityMatrix, angle, xAxis);
-      mat4.rotate(<mat4>worldMatrix, identityMatrix, angle * 2, yAxis);
+      mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, yAxis);
 
-      mat4.translate(worldMatrix, worldMatrix, [5, 3, 0]);
+      // mat4.translate(worldMatrix, worldMatrix, [5, 0, 0]);
 
       // send the updated worldMatrix to the GPU
       this.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
 
       this.clearScreen();
       // this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
+
+      this.gl.bindTexture(this.gl.TEXTURE_2D, wallTexture);
+      this.gl.activeTexture(this.gl.TEXTURE0);
 
       // part 2.5 - instead of using `drawArrays`, we use `drawElements`
       // from the index array with `UNSIGNED_SHORT` data type
@@ -488,6 +548,18 @@ export class App {
      *
      * to rotate an object in multiple axis, we will need to create 1 rotation matrix
      * for each direction to rotate, and multiply them together
+     */
+
+    /**
+     * Part 4 - Texture!!
+     *
+     * 1. add a texture image in the page via <img> tag. set its width and height to 0 to hide it
+     * 2. remove `vertColor` in vertex shader. we will be using texture coordinates instead.
+     *    - we will also be passing texture coords to the fragment shader (from vec3 to vec2)
+     *    - instead of using fragColor values in the fragment shader, we will use 'sampler' - sampling the image
+     * 3. update attribute pointers: use the new `vertTexCoord` instead of the color attribute
+     * 4. update `boxVertices` array - replace RGB values with UV for textures
+     * 5. create texture
      */
   }
 
