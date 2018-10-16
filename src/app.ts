@@ -45,7 +45,7 @@ export class App {
 
 		void main() {
 			fragColor = vertColor;
-			gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);
+      gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);
 		}
 		`;
 
@@ -147,10 +147,10 @@ export class App {
     const boxVertices =
     [ // X, Y, Z           R, G, B
       // Top
-      -1.0, 1.0, -1.0,   0.5, 0.5, 0.5,
-      -1.0, 1.0, 1.0,    0.5, 0.5, 0.5,
-      1.0, 1.0, 1.0,     0.5, 0.5, 0.5,
-      1.0, 1.0, -1.0,    0.5, 0.5, 0.5,
+      -1.0, 1.0, -1.0,   0.5, 0.2, 0.5,
+      -1.0, 1.0, 1.0,    0.7, 0.2, 0.1,
+      1.0, 1.0, 1.0,     0.3, 0.5, 0.3,
+      1.0, 1.0, -1.0,    0.1, 0.3, 0.6,
 
       // Left
       -1.0, 1.0, 1.0,    0.75, 0.25, 0.5,
@@ -377,7 +377,7 @@ export class App {
 
     // set positions in 3d space
     const viewMatrix = new Float32Array(16);
-    const eyePosition = [0, 0, -8];
+    const eyePosition = [0, 0, -20];
     const centerPosition = [0, 0, 0];
     const upPosition = [0, 1, 0];
     mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
@@ -396,11 +396,11 @@ export class App {
       far
     );
 
-    const worldMatrix = new Float32Array(16);
+    // const worldMatrix = new Float32Array(16);
+    const worldMatrix = mat4.create();
     const xRotationMatrix = new Float32Array(16);
     const yRotationMatrix = new Float32Array(16);
-    const zRotationMatrix = new Float32Array(16);
-    const intermediateRotationMatrix = new Float32Array(16);
+    const translationMatrix = new Float32Array(16);
 
     // pass on matices to the shaders
     // "uniform matrix with 4 points, floats, and whatever v is"
@@ -412,10 +412,9 @@ export class App {
     // update worldMatrix every frame
     let angle = 0;
     const identityMatrix = mat4.create();
-    const xAxis = [1, 0, 0];
+    // const xAxis = [1, 0, 0];
     const yAxis = [0, 1, 0];
-    const zAxis = [0, 0, 1];
-    const intervalInSeconds = 10;
+    const intervalInSeconds = 5;
 
     function render() {
       // performance.now() returns relative time in ms since page loads
@@ -427,25 +426,11 @@ export class App {
       // rotate the worldMatrix, by identityMatrix, by `angle` each time, around `yAxis`
       // mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, yAxis);
 
-      // create 3 rotation matrices for each axis
-      mat4.rotate(<mat4>xRotationMatrix, identityMatrix, angle, xAxis);
-      mat4.rotate(<mat4>yRotationMatrix, identityMatrix, angle / 4, yAxis);
-      mat4.rotate(<mat4>zRotationMatrix, identityMatrix, angle, zAxis);
+      // create 2 rotation matrices for each axis
+      // mat4.rotate(<mat4>xRotationMatrix, identityMatrix, angle, xAxis);
+      mat4.rotate(<mat4>worldMatrix, identityMatrix, angle * 2, yAxis);
 
-      // `mat4.multiply` accepts only 2 parameters so i create an intermediate matrix
-      // to rotate x and y axis first, then combine with z axis rotation later
-      mat4.multiply(
-        <mat4>intermediateRotationMatrix,
-        <mat4>xRotationMatrix,
-        <mat4>yRotationMatrix
-      );
-
-      // multiply 3 rotation matrices into the worldMatrix
-      mat4.multiply(
-        <mat4>worldMatrix,
-        <mat4>zRotationMatrix,
-        <mat4>intermediateRotationMatrix
-      );
+      mat4.translate(worldMatrix, worldMatrix, [5, 3, 0]);
 
       // send the updated worldMatrix to the GPU
       this.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
