@@ -31,7 +31,6 @@ export class App {
   }
 
   private draw(model: any) {
-    console.log(model);
     // this.gl.clearColor(0.75, 0.85, 0.8, 1);
     // this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     this.clearScreen();
@@ -43,9 +42,11 @@ export class App {
 		attribute vec3 vertPosition;
     // attribute vec3 vertColor;
     attribute vec2 vertTexCoord;
+    attribute vec3 vertNormal;
 
     // varying vec3 fragColor;
     varying vec2 fragTexCoord;
+    varying vec3 fragNormal;
 
     uniform mat4 mWorld;
     uniform mat4 mView;
@@ -54,20 +55,36 @@ export class App {
 		void main() {
       // fragColor = vertColor;
       fragTexCoord = vertTexCoord;
+      fragNormal = (mWorld * vec4(vertNormal, 0.0)).xyz;
       gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);
 		}
 		`;
 
     const fs = `
-		precision mediump float;
+    precision mediump float;
+
+    uniform vec3 ambientLightIntensity;
+    uniform vec3 sunlightIntensity;
+    uniform vec3 sunlightDirection;
 
     // varying vec3 fragColor;
     varying vec2 fragTexCoord;
+    varying vec3 fragNormal;
+
     uniform sampler2D sampler;
 
 		void main() {
       // gl_FragColor = vec4(fragColor, 1.0);
-      gl_FragColor = texture2D(sampler, fragTexCoord);
+      // gl_FragColor = texture2D(sampler, fragTexCoord);
+
+      vec3 surfaceNormal = normalize(fragNormal);
+      vec3 sunDirNormal = normalize(sunlightDirection);
+
+      vec4 texel = texture2D(sampler, fragTexCoord);
+
+      vec3 lightIntensity = ambientLightIntensity + sunlightIntensity * max(dot(fragNormal, sunDirNormal), 0.0);
+
+      gl_FragColor = vec4(texel.rgb * lightIntensity, texel.a);
 		}
 		`;
 
@@ -271,10 +288,10 @@ export class App {
 
     // model
     const platform = model.meshes[14];
-    console.log(platform);
     const carVertices = platform.vertices;
     const carIndices = [].concat(...platform.faces); // flatten the faces
     const carTexCoords = platform.texturecoords[0];
+    const carNormals = platform.normals;
 
     // create buffer for the car object
     const carVertexBufferObject = this.gl.createBuffer();
@@ -300,6 +317,14 @@ export class App {
     this.gl.bufferData(
       this.gl.ELEMENT_ARRAY_BUFFER,
       new Uint16Array(carIndices),
+      this.gl.STATIC_DRAW
+    );
+
+    const carNormalBufferObject = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carNormalBufferObject);
+    this.gl.bufferData(
+      this.gl.ARRAY_BUFFER,
+      new Float32Array(carNormals),
       this.gl.STATIC_DRAW
     );
 
@@ -354,6 +379,22 @@ export class App {
     );
     this.gl.enableVertexAttribArray(textureAttributeLocation);
 
+    // for the normals
+    const normalAttributeLocation = this.gl.getAttribLocation(
+      program,
+      'vertNormal'
+    );
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carNormalBufferObject);
+    this.gl.vertexAttribPointer(
+      normalAttributeLocation,
+      3,
+      this.gl.FLOAT,
+      true,
+      3 * Float32Array.BYTES_PER_ELEMENT,
+      0
+    );
+    this.gl.enableVertexAttribArray(normalAttributeLocation);
+
     // enable attributes
     // this.gl.enableVertexAttribArray(colorAttributeLocation);
 
@@ -396,6 +437,23 @@ export class App {
     // then we update `vertices` array by adding color values to _each vertex_
 
     // ----- //
+
+    // lighting
+    const ambientLightUniformLocation = this.gl.getUniformLocation(
+      program,
+      'ambientLightIntensity'
+    );
+    const sunlightIntUniformLocation = this.gl.getUniformLocation(
+      program,
+      'sunlightIntensity'
+    );
+    const sunlightDirUniformLocation = this.gl.getUniformLocation(
+      program,
+      'sunlightDirection'
+    );
+    this.gl.uniform3f(ambientLightUniformLocation, 0.2, 0.2, 0.2);
+    this.gl.uniform3f(sunlightIntUniformLocation, 1.0, 1.0, 1.0);
+    this.gl.uniform3f(sunlightDirUniformLocation, 4.0, 4.0, 4.0);
 
     /**
      * Part 2 - A Rotating Cube
@@ -441,7 +499,7 @@ export class App {
 
     // set positions in 3d space
     const viewMatrix = new Float32Array(16);
-    const eyePosition = [0, 200, -800];
+    const eyePosition = [0, 300, -600];
     const centerPosition = [0, 0, 0];
     const upPosition = [0, 1, 0];
     mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
@@ -492,7 +550,7 @@ export class App {
 
       // create 2 rotation matrices for each axis
       mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, [0, 1, 0]);
-      // mat4.rotate(<mat4>worldMatrix, worldMatrix, angle * 0.1, [0, 0, 1]);
+      mat4.rotate(<mat4>worldMatrix, worldMatrix, angle * 0.1, [0, 0, 1]);
       // mat4.multiply(worldMatrix, worldMatrix, <mat4>xRotationMatrix);
 
       // mat4.translate(worldMatrix, worldMatrix, [5, 0, 0]);
