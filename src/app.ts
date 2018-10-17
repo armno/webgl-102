@@ -166,9 +166,9 @@ export class App {
       -1.0, 1.0, -1.0,   1, 0,
 
       // Right
-      1.0, 1.0, 1.0,     0, 0,
+      1.0, 1.0, 1.0,     1, 1,
       1.0, -1.0, 1.0,    1, 0,
-      1.0, -1.0, -1.0,   1, 1,
+      1.0, -1.0, -1.0,   0, 0,
       1.0, 1.0, -1.0,    0, 1,
 
       // Front
@@ -186,8 +186,8 @@ export class App {
       // Bottom
       -1.0, -1.0, -1.0,   0, 0,
       -1.0, -1.0, 1.0,    0, 1,
-      1.0, -1.0, 1.0,     0, 0,
-      1.0, -1.0, -1.0,    1, 1
+      1.0, -1.0, 1.0,     1, 1,
+      1.0, -1.0, -1.0,    1, 0
     ];
 
     // index array - this tells which points to use for each cube face
@@ -326,45 +326,7 @@ export class App {
     // -----
 
     // Create texture
-    const wallTexture = this.gl.createTexture();
-    this.gl.bindTexture(this.gl.TEXTURE_2D, wallTexture);
-
-    // opengl uses `S` and `T` instead of `U` and `V` respectively
-    this.gl.texParameteri(
-      this.gl.TEXTURE_2D,
-      this.gl.TEXTURE_WRAP_S,
-      this.gl.CLAMP_TO_EDGE
-    );
-    this.gl.texParameteri(
-      this.gl.TEXTURE_2D,
-      this.gl.TEXTURE_WRAP_T,
-      this.gl.CLAMP_TO_EDGE
-    );
-
-    // sampling
-    this.gl.texParameteri(
-      this.gl.TEXTURE_2D,
-      this.gl.TEXTURE_MIN_FILTER,
-      this.gl.LINEAR
-    );
-    this.gl.texParameteri(
-      this.gl.TEXTURE_2D,
-      this.gl.TEXTURE_MAG_FILTER,
-      this.gl.LINEAR
-    );
-
-    // load the texture, for real
-    this.gl.texImage2D(
-      this.gl.TEXTURE_2D,
-      0,
-      this.gl.RGBA,
-      this.gl.RGBA,
-      this.gl.UNSIGNED_BYTE,
-      <TexImageSource>document.getElementById('wall-texture')
-    );
-
-    // unbind the texture to save up some memory
-    this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+    const wallTexture = this.loadTexture('wall.png');
 
     // main render loop
     this.gl.useProgram(program);
@@ -435,7 +397,7 @@ export class App {
 
     // set positions in 3d space
     const viewMatrix = new Float32Array(16);
-    const eyePosition = [0, 0, -20];
+    const eyePosition = [0, 0, -10];
     const centerPosition = [0, 0, 0];
     const upPosition = [0, 1, 0];
     mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
@@ -470,7 +432,7 @@ export class App {
     // update worldMatrix every frame
     let angle = 0;
     const identityMatrix = mat4.create();
-    const xAxis = [1, 0, 0];
+    const xyAxis = [1, 0.5, 0.5];
     const yAxis = [0, 1, 0];
     const intervalInSeconds = 10;
 
@@ -482,10 +444,12 @@ export class App {
       angle = (performance.now() / 1000 / intervalInSeconds) * 2 * Math.PI;
 
       // rotate the worldMatrix, by identityMatrix, by `angle` each time, around `yAxis`
-      // mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, yAxis);
+      // mat4.rotate(<mat4>xRotationMatrix, identityMatrix, angle * 0.1, xAxis);
 
       // create 2 rotation matrices for each axis
-      mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, yAxis);
+      mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, [0, 1, 0]);
+      mat4.rotate(<mat4>worldMatrix, worldMatrix, angle * 0.1, [0, 0, 1]);
+      // mat4.multiply(worldMatrix, worldMatrix, <mat4>xRotationMatrix);
 
       // mat4.translate(worldMatrix, worldMatrix, [5, 0, 0]);
 
@@ -566,5 +530,77 @@ export class App {
   clearScreen() {
     this.gl.clearColor(0.75, 0.85, 0.8, 1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+  }
+
+  loadTexture(src: string) {
+    const wallTexture = this.gl.createTexture();
+    this.gl.bindTexture(this.gl.TEXTURE_2D, wallTexture);
+
+    // source: mdn
+    // the image can take some time to load over the network
+    // while it is downloading, we fill the texture with gray pixels
+    const level = 0;
+    const internalFormat = this.gl.RGBA;
+    const srcFormat = this.gl.RGBA;
+    const width = 1;
+    const height = 1;
+    const border = 0;
+    const pixel = new Uint8Array([128, 128, 128, 255]);
+
+    this.gl.texImage2D(
+      this.gl.TEXTURE_2D,
+      level,
+      internalFormat,
+      width,
+      height,
+      border,
+      srcFormat,
+      this.gl.UNSIGNED_BYTE,
+      pixel
+    );
+
+    // once the image is loaded, we bind the texture again with the image itself
+    const image = new Image();
+    image.onload = () => {
+      this.gl.bindTexture(this.gl.TEXTURE_2D, wallTexture);
+      this.gl.texImage2D(
+        this.gl.TEXTURE_2D,
+        level,
+        internalFormat,
+        srcFormat,
+        this.gl.UNSIGNED_BYTE,
+        image
+      );
+
+      // opengl uses `S` and `T` instead of `U` and `V` respectively
+      this.gl.texParameteri(
+        this.gl.TEXTURE_2D,
+        this.gl.TEXTURE_WRAP_S,
+        this.gl.CLAMP_TO_EDGE
+      );
+      this.gl.texParameteri(
+        this.gl.TEXTURE_2D,
+        this.gl.TEXTURE_WRAP_T,
+        this.gl.CLAMP_TO_EDGE
+      );
+
+      // sampling
+      this.gl.texParameteri(
+        this.gl.TEXTURE_2D,
+        this.gl.TEXTURE_MIN_FILTER,
+        this.gl.LINEAR
+      );
+      this.gl.texParameteri(
+        this.gl.TEXTURE_2D,
+        this.gl.TEXTURE_MAG_FILTER,
+        this.gl.LINEAR
+      );
+    };
+    image.src = src;
+
+    // unbind the texture to save up some memory
+    // this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+
+    return wallTexture;
   }
 }
