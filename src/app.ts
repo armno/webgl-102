@@ -23,10 +23,15 @@ export class App {
     this.gl = gl;
     this.canvasHeight = canvas.height;
     this.canvasWidth = canvas.width;
-    this.draw();
+    fetch('./car.json')
+      .then(response => response.json())
+      .then(model => {
+        this.draw(model);
+      });
   }
 
-  private draw() {
+  private draw(model: any) {
+    console.log(model);
     // this.gl.clearColor(0.75, 0.85, 0.8, 1);
     // this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     this.clearScreen();
@@ -227,12 +232,12 @@ export class App {
     // const triangleBuffer = this.gl.createBuffer();
 
     // part 2.5: create box buffer instead of triangle buffers
-    const boxVertexBufferObject = this.gl.createBuffer();
+    // const boxVertexBufferObject = this.gl.createBuffer();
 
     // then we bind the `vertices` array to the created buffer
     // we want to use ARRAY_BUFFER as a "target"
     // this.gl.bindBuffer(this.gl.ARRAY_BUFFER, triangleBuffer);
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, boxVertexBufferObject);
+    // this.gl.bindBuffer(this.gl.ARRAY_BUFFER, boxVertexBufferObject);
 
     // specify data for the buffer
     // - target use ARRAY_BUFFER as the target
@@ -243,22 +248,58 @@ export class App {
     //   new Float32Array(vertices),
     //   this.gl.STATIC_DRAW
     // );
-    this.gl.bufferData(
-      this.gl.ARRAY_BUFFER,
-      new Float32Array(boxVertices),
-      this.gl.STATIC_DRAW
-    );
+
+    // box
+    // this.gl.bufferData(
+    //   this.gl.ARRAY_BUFFER,
+    //   new Float32Array(boxVertices),
+    //   this.gl.STATIC_DRAW
+    // );
 
     // part 2.5
     // we create another buffer for index array
     // for index array, we use gl.ELEMENT_ARRAY_BUFFER instead
     // also, data source is now `Uinit16Array` because index array contains
     // values of unsigned integers instead of floats
-    const boxIndexBufferObject = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, boxIndexBufferObject);
+    // const boxIndexBufferObject = this.gl.createBuffer();
+    // this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, boxIndexBufferObject);
+    // this.gl.bufferData(
+    //   this.gl.ELEMENT_ARRAY_BUFFER,
+    //   new Uint16Array(boxIndices),
+    //   this.gl.STATIC_DRAW
+    // );
+
+    // model
+    const platform = model.meshes[14];
+    console.log(platform);
+    const carVertices = platform.vertices;
+    const carIndices = [].concat(...platform.faces); // flatten the faces
+    const carTexCoords = platform.texturecoords[0];
+
+    // create buffer for the car object
+    const carVertexBufferObject = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carVertexBufferObject);
+    this.gl.bufferData(
+      this.gl.ARRAY_BUFFER,
+      new Float32Array(carVertices),
+      this.gl.STATIC_DRAW
+    );
+
+    // model
+    // create another buffer for texture coords
+    const carTexCoordsBufferObject = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carTexCoordsBufferObject);
+    this.gl.bufferData(
+      this.gl.ARRAY_BUFFER,
+      new Float32Array(carTexCoords),
+      this.gl.STATIC_DRAW
+    );
+
+    const carIndexBufferObject = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, carIndexBufferObject);
     this.gl.bufferData(
       this.gl.ELEMENT_ARRAY_BUFFER,
-      new Uint16Array(boxIndices),
+      new Uint16Array(carIndices),
       this.gl.STATIC_DRAW
     );
 
@@ -285,6 +326,7 @@ export class App {
     );
 
     // here comes a monster method
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carVertexBufferObject);
     // prettier-ignore
     this.gl.vertexAttribPointer(
 			positionAttributeLocation, // position of the attribute we found just above
@@ -292,27 +334,29 @@ export class App {
 			this.gl.FLOAT, // type of elements
 			false, // dont normalize - note: there is no gl.FALSE
       // 6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex
-      5 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
+      3 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
 			0 // offset from the beginning of a single vertex to this attribute
 		);
+    this.gl.enableVertexAttribArray(positionAttributeLocation);
 
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carTexCoordsBufferObject);
     // prettier-ignore
     this.gl.vertexAttribPointer(
       // colorAttributeLocation, // now we use the color attribute
       textureAttributeLocation,
       // 3, // for colors we have R,G,B values so it's 3
       2, // u and v in texture coords
-			this.gl.FLOAT, // we still use floats here
-			false, // nope
-			// 6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex (same as positionAttributeLocation)
-			5 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
-			3 * Float32Array.BYTES_PER_ELEMENT // offset: 2 from the beginning of each vertex
-		)
+      this.gl.FLOAT, // we still use floats here
+      false, // nope
+      // 6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex (same as positionAttributeLocation)
+      2 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
+      0
+    );
+    this.gl.enableVertexAttribArray(textureAttributeLocation);
 
     // enable attributes
-    this.gl.enableVertexAttribArray(positionAttributeLocation);
     // this.gl.enableVertexAttribArray(colorAttributeLocation);
-    this.gl.enableVertexAttribArray(textureAttributeLocation);
+
     this.gl.enable(this.gl.DEPTH_TEST);
 
     // part 2.5 - enable CULL_FACE to prevent opengl to do all calculations
@@ -397,7 +441,7 @@ export class App {
 
     // set positions in 3d space
     const viewMatrix = new Float32Array(16);
-    const eyePosition = [0, 0, -10];
+    const eyePosition = [0, 200, -800];
     const centerPosition = [0, 0, 0];
     const upPosition = [0, 1, 0];
     mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
@@ -448,7 +492,7 @@ export class App {
 
       // create 2 rotation matrices for each axis
       mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, [0, 1, 0]);
-      mat4.rotate(<mat4>worldMatrix, worldMatrix, angle * 0.1, [0, 0, 1]);
+      // mat4.rotate(<mat4>worldMatrix, worldMatrix, angle * 0.1, [0, 0, 1]);
       // mat4.multiply(worldMatrix, worldMatrix, <mat4>xRotationMatrix);
 
       // mat4.translate(worldMatrix, worldMatrix, [5, 0, 0]);
@@ -466,7 +510,7 @@ export class App {
       // from the index array with `UNSIGNED_SHORT` data type
       this.gl.drawElements(
         this.gl.TRIANGLES,
-        boxIndices.length,
+        carIndices.length,
         this.gl.UNSIGNED_SHORT,
         0
       );
@@ -524,6 +568,14 @@ export class App {
      * 3. update attribute pointers: use the new `vertTexCoord` instead of the color attribute
      * 4. update `boxVertices` array - replace RGB values with UV for textures
      * 5. create texture
+     */
+
+    /**
+     * Part 5: Loading 3D model!
+     *
+     * 1. download a free 3D model
+     * 2. convert to JSON using assimp2json http://www.greentoken.de/onlineconv/
+     * 3. load the JSON via fetch
      */
   }
 
