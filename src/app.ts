@@ -21,8 +21,8 @@ export class App {
     }
 
     this.gl = gl;
-    this.canvasHeight = canvas.height;
-    this.canvasWidth = canvas.width;
+    this.canvasHeight = canvas.clientHeight;
+    this.canvasWidth = canvas.clientWidth;
     fetch('./car.json')
       .then(response => response.json())
       .then(model => {
@@ -434,6 +434,7 @@ export class App {
     const intervalInSeconds = 10;
 
     function render() {
+      this.resize(this.gl.canvas);
       // performance.now() returns relative time in ms since page loads
       // ` / 1000` to convert from ms to seconds
       // ` / 6` to get value of angle to increase per each frame
@@ -716,5 +717,17 @@ export class App {
       0
     );
     this.gl.enableVertexAttribArray(normalAttributeLocation);
+  }
+
+  private resize(canvas: HTMLCanvasElement) {
+    const displayWidth = canvas.clientWidth;
+    const displayHeight = canvas.clientHeight;
+
+    if (displayWidth !== canvas.width || displayHeight !== canvas.height) {
+      canvas.width = displayWidth;
+      canvas.height = displayHeight;
+    }
+
+    this.gl.viewport(0, 0, this.canvasWidth, this.canvasHeight);
   }
 }
