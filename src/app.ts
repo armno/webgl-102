@@ -286,115 +286,10 @@ export class App {
     //   this.gl.STATIC_DRAW
     // );
 
-    // model
+    // draw models
     const platform = model.meshes[14];
-    const carVertices = platform.vertices;
-    const carIndices = [].concat(...platform.faces); // flatten the faces
-    const carTexCoords = platform.texturecoords[0];
-    const carNormals = platform.normals;
-
-    // create buffer for the car object
-    const carVertexBufferObject = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carVertexBufferObject);
-    this.gl.bufferData(
-      this.gl.ARRAY_BUFFER,
-      new Float32Array(carVertices),
-      this.gl.STATIC_DRAW
-    );
-
-    // model
-    // create another buffer for texture coords
-    const carTexCoordsBufferObject = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carTexCoordsBufferObject);
-    this.gl.bufferData(
-      this.gl.ARRAY_BUFFER,
-      new Float32Array(carTexCoords),
-      this.gl.STATIC_DRAW
-    );
-
-    const carIndexBufferObject = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, carIndexBufferObject);
-    this.gl.bufferData(
-      this.gl.ELEMENT_ARRAY_BUFFER,
-      new Uint16Array(carIndices),
-      this.gl.STATIC_DRAW
-    );
-
-    const carNormalBufferObject = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carNormalBufferObject);
-    this.gl.bufferData(
-      this.gl.ARRAY_BUFFER,
-      new Float32Array(carNormals),
-      this.gl.STATIC_DRAW
-    );
-
-    // -----
-
-    // now we need to send our `vertices` data to the vertex shader
-    // first by getting the position (memory address i think) of the attribute `vertPosition`
-    // in the vertex shader.
-
-    // note: we can attribute location from the created `program`, not from the vertex shader itself.
-    const positionAttributeLocation = this.gl.getAttribLocation(
-      program,
-      'vertPosition'
-    );
-
-    const colorAttributeLocation = this.gl.getAttribLocation(
-      program,
-      'vertColor'
-    );
-
-    const textureAttributeLocation = this.gl.getAttribLocation(
-      program,
-      'vertTexCoord'
-    );
-
-    // here comes a monster method
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carVertexBufferObject);
-    // prettier-ignore
-    this.gl.vertexAttribPointer(
-			positionAttributeLocation, // position of the attribute we found just above
-			3, // number of elements (floats) per attribute
-			this.gl.FLOAT, // type of elements
-			false, // dont normalize - note: there is no gl.FALSE
-      // 6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex
-      3 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
-			0 // offset from the beginning of a single vertex to this attribute
-		);
-    this.gl.enableVertexAttribArray(positionAttributeLocation);
-
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carTexCoordsBufferObject);
-    // prettier-ignore
-    this.gl.vertexAttribPointer(
-      // colorAttributeLocation, // now we use the color attribute
-      textureAttributeLocation,
-      // 3, // for colors we have R,G,B values so it's 3
-      2, // u and v in texture coords
-      this.gl.FLOAT, // we still use floats here
-      false, // nope
-      // 6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex (same as positionAttributeLocation)
-      2 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
-      0
-    );
-    this.gl.enableVertexAttribArray(textureAttributeLocation);
-
-    // for the normals
-    const normalAttributeLocation = this.gl.getAttribLocation(
-      program,
-      'vertNormal'
-    );
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carNormalBufferObject);
-    this.gl.vertexAttribPointer(
-      normalAttributeLocation,
-      3,
-      this.gl.FLOAT,
-      true,
-      3 * Float32Array.BYTES_PER_ELEMENT,
-      0
-    );
-    this.gl.enableVertexAttribArray(normalAttributeLocation);
-
+    const platformIndices = [].concat(...platform.faces); // flatten the faces
+    this.drawPlatform(platform, program);
     // enable attributes
     // this.gl.enableVertexAttribArray(colorAttributeLocation);
 
@@ -453,7 +348,7 @@ export class App {
     );
     this.gl.uniform3f(ambientLightUniformLocation, 0.2, 0.2, 0.2);
     this.gl.uniform3f(sunlightIntUniformLocation, 1.0, 1.0, 1.0);
-    this.gl.uniform3f(sunlightDirUniformLocation, 4.0, 4.0, 4.0);
+    this.gl.uniform3f(sunlightDirUniformLocation, -4.0, 2.0, 0.0);
 
     /**
      * Part 2 - A Rotating Cube
@@ -568,7 +463,7 @@ export class App {
       // from the index array with `UNSIGNED_SHORT` data type
       this.gl.drawElements(
         this.gl.TRIANGLES,
-        carIndices.length,
+        platformIndices.length,
         this.gl.UNSIGNED_SHORT,
         0
       );
@@ -706,11 +601,120 @@ export class App {
         this.gl.LINEAR
       );
     };
-    image.src = src;
+    // image.src = src;
 
     // unbind the texture to save up some memory
     // this.gl.bindTexture(this.gl.TEXTURE_2D, null);
 
     return wallTexture;
+  }
+
+  private drawPlatform(platform: any, program: WebGLProgram) {
+    const carVertices = platform.vertices;
+    const carIndices = [].concat(...platform.faces); // flatten the faces
+    const carTexCoords = platform.texturecoords[0];
+    const carNormals = platform.normals;
+
+    // create buffer for the car object
+    const carVertexBufferObject = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carVertexBufferObject);
+    this.gl.bufferData(
+      this.gl.ARRAY_BUFFER,
+      new Float32Array(carVertices),
+      this.gl.STATIC_DRAW
+    );
+
+    // model
+    // create another buffer for texture coords
+    const carTexCoordsBufferObject = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carTexCoordsBufferObject);
+    this.gl.bufferData(
+      this.gl.ARRAY_BUFFER,
+      new Float32Array(carTexCoords),
+      this.gl.STATIC_DRAW
+    );
+
+    const carIndexBufferObject = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, carIndexBufferObject);
+    this.gl.bufferData(
+      this.gl.ELEMENT_ARRAY_BUFFER,
+      new Uint16Array(carIndices),
+      this.gl.STATIC_DRAW
+    );
+
+    const carNormalBufferObject = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carNormalBufferObject);
+    this.gl.bufferData(
+      this.gl.ARRAY_BUFFER,
+      new Float32Array(carNormals),
+      this.gl.STATIC_DRAW
+    );
+
+    // -----
+
+    // now we need to send our `vertices` data to the vertex shader
+    // first by getting the position (memory address i think) of the attribute `vertPosition`
+    // in the vertex shader.
+
+    // note: we can attribute location from the created `program`, not from the vertex shader itself.
+    const positionAttributeLocation = this.gl.getAttribLocation(
+      program,
+      'vertPosition'
+    );
+
+    const colorAttributeLocation = this.gl.getAttribLocation(
+      program,
+      'vertColor'
+    );
+
+    const textureAttributeLocation = this.gl.getAttribLocation(
+      program,
+      'vertTexCoord'
+    );
+
+    // here comes a monster method
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carVertexBufferObject);
+    // prettier-ignore
+    this.gl.vertexAttribPointer(
+			positionAttributeLocation, // position of the attribute we found just above
+			3, // number of elements (floats) per attribute
+			this.gl.FLOAT, // type of elements
+			false, // dont normalize - note: there is no gl.FALSE
+      // 6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex
+      3 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
+			0 // offset from the beginning of a single vertex to this attribute
+		);
+    this.gl.enableVertexAttribArray(positionAttributeLocation);
+
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carTexCoordsBufferObject);
+    // prettier-ignore
+    this.gl.vertexAttribPointer(
+      // colorAttributeLocation, // now we use the color attribute
+      textureAttributeLocation,
+      // 3, // for colors we have R,G,B values so it's 3
+      2, // u and v in texture coords
+      this.gl.FLOAT, // we still use floats here
+      false, // nope
+      // 6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex (same as positionAttributeLocation)
+      2 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
+      0
+    );
+    this.gl.enableVertexAttribArray(textureAttributeLocation);
+
+    // for the normals
+    const normalAttributeLocation = this.gl.getAttribLocation(
+      program,
+      'vertNormal'
+    );
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carNormalBufferObject);
+    this.gl.vertexAttribPointer(
+      normalAttributeLocation,
+      3,
+      this.gl.FLOAT,
+      true,
+      3 * Float32Array.BYTES_PER_ELEMENT,
+      0
+    );
+    this.gl.enableVertexAttribArray(normalAttributeLocation);
   }
 }
