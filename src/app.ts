@@ -25,26 +25,130 @@ export class App {
     this.canvasWidth = canvas.clientWidth;
     fetch('./car.json')
       .then(response => response.json())
-      .then(model => {
-        this.draw(model);
-      });
+      .then(model => this.draw(model));
   }
 
   private draw(model: any) {
-    // this.gl.clearColor(0.75, 0.85, 0.8, 1);
-    // this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-    this.clearScreen();
+    const { vertexShader, fragmentShader } = this.createShaders(this.gl);
+    const program = this.createProgram(this.gl, vertexShader, fragmentShader);
 
+    const meshes = model.meshes;
+    const objectsToDraw = meshes.map((object: any, i: number) => {
+      const objectBuffers = this.createBuffers(this.gl, program, object);
+      const color = this.setColor(i);
+      return {
+        color,
+        ...objectBuffers
+      };
+    });
+
+    this.gl.enable(this.gl.DEPTH_TEST);
+    this.gl.enable(this.gl.CULL_FACE);
+    this.gl.frontFace(this.gl.CCW);
+    this.gl.cullFace(this.gl.BACK);
+
+    this.gl.useProgram(program);
+
+    // lighting
+    this.setupLighting(this.gl, program);
+
+    const { worldMatrix, matWorldUniformLocation } = this.setCamera(
+      this.gl,
+      program
+    );
+    // main render loop - make things animate!
+    // update worldMatrix every frame
+    let angle = 0;
+    const identityMatrix = mat4.create();
+    const intervalInSeconds = 20;
+
+    function render() {
+      this.resize(this.gl.canvas);
+      // performance.now() returns relative time in ms since page loads
+      // ` / 1000` to convert from ms to seconds
+      // ` / 6` to get value of angle to increase per each frame
+      // result = 1 full rotation every 6 seconds
+      angle = (performance.now() / 1000 / intervalInSeconds) * 2 * Math.PI;
+
+      // create 2 rotation matrices for each axis
+      mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, [0, 1, 0]);
+      // mat4.rotate(<mat4>worldMatrix, worldMatrix, angle * 0.1, [0, 0, 1]);
+      // mat4.multiply(worldMatrix, worldMatrix, <mat4>xRotationMatrix);
+
+      // send the updated worldMatrix to the GPU
+      this.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
+
+      this.clearScreen();
+
+      objectsToDraw.forEach((object: any) => {
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, object.index.buffer);
+
+        this.drawVertex(this.gl, program, object.vertex.buffer);
+        this.drawNormals(this.gl, program, object.normal.buffer);
+        this.drawColor(this.gl, program, object.color);
+
+        this.gl.drawElements(
+          this.gl.TRIANGLES,
+          object.index.numElements,
+          this.gl.UNSIGNED_SHORT,
+          0
+        );
+      });
+
+      requestAnimationFrame(render.bind(this));
+    }
+
+    requestAnimationFrame(render.bind(this));
+  }
+
+  clearScreen() {
+    this.gl.clearColor(0.75, 0.85, 0.8, 1);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+  }
+
+  private setColor(i: number): number[] {
+    if (i === 5) {
+      // window
+      return [66, 140, 224, 200];
+    }
+
+    if (i === 1 || i === 2 || i === 9 || i === 10 || i === 12 || i === 13) {
+      return [0, 0, 0, 255];
+    }
+
+    if (i === 3) {
+      // stripes
+      return [255, 255, 255, 255];
+    }
+
+    if (i === 6 || i === 7) {
+      // lights
+      return [255, 230, 104, 255];
+    }
+
+    if (i === 14) {
+      // platform
+      return [180, 180, 180, 255];
+    }
+
+    // base color - red
+    return [180, 10, 10, 255];
+  }
+
+  private createShaders(
+    gl: WebGLRenderingContext
+  ): {
+    vertexShader: WebGLShader;
+    fragmentShader: WebGLShader;
+  } {
     // shader code
     const vs = `
 		precision mediump float;
 
 		attribute vec3 vertPosition;
-    // attribute vec3 vertColor;
     attribute vec2 vertTexCoord;
     attribute vec3 vertNormal;
 
-    // varying vec3 fragColor;
     varying vec2 fragTexCoord;
     varying vec3 fragNormal;
 
@@ -53,7 +157,6 @@ export class App {
     uniform mat4 mProj;
 
 		void main() {
-      // fragColor = vertColor;
       fragTexCoord = vertTexCoord;
       fragNormal = (mWorld * vec4(vertNormal, 0.0)).xyz;
       gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);
@@ -67,20 +170,17 @@ export class App {
     uniform vec3 sunlightIntensity;
     uniform vec3 sunlightDirection;
 
-    // varying vec3 fragColor;
     varying vec2 fragTexCoord;
     varying vec3 fragNormal;
 
     uniform sampler2D sampler;
+    uniform vec4 fragColor;
 
 		void main() {
-      // gl_FragColor = vec4(fragColor, 1.0);
-      // gl_FragColor = texture2D(sampler, fragTexCoord);
 
       vec3 surfaceNormal = normalize(fragNormal);
       vec3 sunDirNormal = normalize(sunlightDirection);
-
-      vec4 texel = texture2D(sampler, fragTexCoord);
+      vec4 texel = fragColor / 255.0;
 
       vec3 lightIntensity = ambientLightIntensity + sunlightIntensity * max(dot(fragNormal, sunDirNormal), 0.0);
 
@@ -89,44 +189,49 @@ export class App {
 		`;
 
     // create shaders by specifying the shader type
-    const vertexShader: WebGLShader = this.gl.createShader(
-      this.gl.VERTEX_SHADER
-    );
-    const fragmentShader: WebGLShader = this.gl.createShader(
+    const vertexShader: WebGLShader = gl.createShader(this.gl.VERTEX_SHADER);
+    const fragmentShader: WebGLShader = gl.createShader(
       this.gl.FRAGMENT_SHADER
     );
 
     // specifying shader source (the shader code)
     // (attach source code to each shader)
-    this.gl.shaderSource(vertexShader, vs);
-    this.gl.shaderSource(fragmentShader, fs);
+    gl.shaderSource(vertexShader, vs);
+    gl.shaderSource(fragmentShader, fs);
 
     // then compile each shader
-    this.gl.compileShader(vertexShader);
-    this.gl.compileShader(fragmentShader);
+    gl.compileShader(vertexShader);
+    gl.compileShader(fragmentShader);
 
     // check if the shader compiles (no syntax errors in the shader code)
-    if (!this.gl.getShaderParameter(vertexShader, this.gl.COMPILE_STATUS)) {
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
       console.error(
         'Error compiling vertex shader',
-        this.gl.getShaderInfoLog(vertexShader)
+        gl.getShaderInfoLog(vertexShader)
       );
       return;
     }
 
-    if (!this.gl.getShaderParameter(fragmentShader, this.gl.COMPILE_STATUS)) {
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
       console.error(
         'Error compiling fragment shader',
-        this.gl.getShaderInfoLog(fragmentShader)
+        gl.getShaderInfoLog(fragmentShader)
       );
       return;
     }
 
-    // -----
+    return {
+      vertexShader,
+      fragmentShader
+    };
+  }
 
-    // combine 2 shaders: tell opengl to use these shaders in a "program"
-    // create new webgl "program"
-    const program: WebGLProgram = this.gl.createProgram();
+  private createProgram(
+    gl: WebGLRenderingContext,
+    vertexShader: WebGLShader,
+    fragmentShader: WebGLShader
+  ): WebGLProgram {
+    const program: WebGLProgram = gl.createProgram();
 
     // then attach compiled shaders to the program
     this.gl.attachShader(program, vertexShader);
@@ -155,459 +260,56 @@ export class App {
       return;
     }
 
-    // -----
-
-    // now our shaders are ready. then we can start drawing something!
-    // first create an array of vertices: points in opengl coordinates system
-    // to tell opengl where to put these points.
-
-    // we create 3 vertex, each vertex contains 2 floats: x and y
-    // prettier-ignore
-    const vertices: number[] =
-		[ // x, y, z          R, G, B
-			 0.0, 0.5, 0.0,     1.0, 0.2, 0.0,
-			-0.5, -0.5, 0.0,    0.8, 0.5, 0.7,
-			 0.5, -0.5, 0.0,    0.0, 0.3, 0.9
-      ];
-
-    // @see Part 2.5
-    // 6 faces of the cube. each face has 4 points
-    // prettier-ignore
-    const boxVertices =
-    [ // X, Y, Z         U, V
-      // Top
-      -1.0, 1.0, -1.0,   0, 0,
-      -1.0, 1.0, 1.0,    0, 1,
-      1.0, 1.0, 1.0,     1, 1,
-      1.0, 1.0, -1.0,    1, 0,
-
-      // Left
-      -1.0, 1.0, 1.0,    0, 0,
-      -1.0, -1.0, 1.0,   0, 1,
-      -1.0, -1.0, -1.0,  1, 1,
-      -1.0, 1.0, -1.0,   1, 0,
-
-      // Right
-      1.0, 1.0, 1.0,     1, 1,
-      1.0, -1.0, 1.0,    1, 0,
-      1.0, -1.0, -1.0,   0, 0,
-      1.0, 1.0, -1.0,    0, 1,
-
-      // Front
-      1.0, 1.0, 1.0,     1, 1,
-      1.0, -1.0, 1.0,    1, 0,
-      -1.0, -1.0, 1.0,   0, 0,
-      -1.0, 1.0, 1.0,    0, 1,
-
-      // Back
-      1.0, 1.0, -1.0,     0, 0,
-      1.0, -1.0, -1.0,    0, 1,
-      -1.0, -1.0, -1.0,   1, 1,
-      -1.0, 1.0, -1.0,    1, 0,
-
-      // Bottom
-      -1.0, -1.0, -1.0,   0, 0,
-      -1.0, -1.0, 1.0,    0, 1,
-      1.0, -1.0, 1.0,     1, 1,
-      1.0, -1.0, -1.0,    1, 0
-    ];
-
-    // index array - this tells which points to use for each cube face
-    // prettier-ignore
-    const boxIndices =
-      [
-        // Top
-        0, 1, 2,
-        0, 2, 3,
-
-        // Left
-        5, 4, 6,
-        6, 4, 7,
-
-        // Right
-        8, 9, 10,
-        8, 10, 11,
-
-        // Front
-        13, 12, 14,
-        15, 14, 12,
-
-        // Back
-        16, 17, 18,
-        16, 18, 19,
-
-        // Bottom
-        21, 20, 22,
-        22, 20, 23
-      ];
-
-    // `vertices` is an array of numbers lives on the CPU (browser),
-    // the GPU will not understand this format.
-    // we need to convert this array into a "buffer" - something the GPU can understand
-
-    // by creating a buffer, we allocate some memory in the GPU
-    // const triangleBuffer = this.gl.createBuffer();
-
-    // part 2.5: create box buffer instead of triangle buffers
-    // const boxVertexBufferObject = this.gl.createBuffer();
-
-    // then we bind the `vertices` array to the created buffer
-    // we want to use ARRAY_BUFFER as a "target"
-    // this.gl.bindBuffer(this.gl.ARRAY_BUFFER, triangleBuffer);
-    // this.gl.bindBuffer(this.gl.ARRAY_BUFFER, boxVertexBufferObject);
-
-    // specify data for the buffer
-    // - target use ARRAY_BUFFER as the target
-    // - data: convert `vertices` array to something that works with opengl - the Float32Array
-    // - usage: tell opengl that the `data` will not change after it is used
-    // this.gl.bufferData(
-    //   this.gl.ARRAY_BUFFER,
-    //   new Float32Array(vertices),
-    //   this.gl.STATIC_DRAW
-    // );
-
-    // box
-    // this.gl.bufferData(
-    //   this.gl.ARRAY_BUFFER,
-    //   new Float32Array(boxVertices),
-    //   this.gl.STATIC_DRAW
-    // );
-
-    // part 2.5
-    // we create another buffer for index array
-    // for index array, we use gl.ELEMENT_ARRAY_BUFFER instead
-    // also, data source is now `Uinit16Array` because index array contains
-    // values of unsigned integers instead of floats
-    // const boxIndexBufferObject = this.gl.createBuffer();
-    // this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, boxIndexBufferObject);
-    // this.gl.bufferData(
-    //   this.gl.ELEMENT_ARRAY_BUFFER,
-    //   new Uint16Array(boxIndices),
-    //   this.gl.STATIC_DRAW
-    // );
-
-    // draw models
-    const platform = model.meshes[14];
-    const platformIndices = [].concat(...platform.faces); // flatten the faces
-    this.drawPlatform(platform, program);
-    // enable attributes
-    // this.gl.enableVertexAttribArray(colorAttributeLocation);
-
-    this.gl.enable(this.gl.DEPTH_TEST);
-
-    // part 2.5 - enable CULL_FACE to prevent opengl to do all calculations
-    // for faces in the back, which are not visible to the user.
-    this.gl.enable(this.gl.CULL_FACE);
-
-    // tell webgl which face is the front face and the cull face
-    this.gl.frontFace(this.gl.CCW);
-    this.gl.cullFace(this.gl.BACK);
-
-    // -----
-
-    // Create texture
-    const wallTexture = this.loadTexture('wall.png');
-
-    // main render loop
-    this.gl.useProgram(program);
-
-    // draw using arrays of points (as opposed of draw elements)
-    // - draw in triangles mode
-    // - skip 0 indexes
-    // - there are 3 vertex to draw
-    // note: commented out in Part 2
-    // this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
-
-    // now we should get a tomato-ish color triangle on the screen
-
-    // -----
-
-    // passing information from vertex shader to fragment shader
-    // update shaders code:
-    // - add `vertColor` attribtue to the vertex shader
-    // - add `fragColor` varying (return) to the vertex shader
-    // - set `fragColor = vertColor` - send color values from vertices
-    // - use `fragColor` in fragment shader instead hard-coded color values
-
-    // then we update `vertices` array by adding color values to _each vertex_
-
-    // ----- //
-
-    // lighting
-    const ambientLightUniformLocation = this.gl.getUniformLocation(
-      program,
-      'ambientLightIntensity'
-    );
-    const sunlightIntUniformLocation = this.gl.getUniformLocation(
-      program,
-      'sunlightIntensity'
-    );
-    const sunlightDirUniformLocation = this.gl.getUniformLocation(
-      program,
-      'sunlightDirection'
-    );
-    this.gl.uniform3f(ambientLightUniformLocation, 0.2, 0.2, 0.2);
-    this.gl.uniform3f(sunlightIntUniformLocation, 1.0, 1.0, 1.0);
-    this.gl.uniform3f(sunlightDirUniformLocation, -4.0, 2.0, 0.0);
-
-    /**
-     * Part 2 - A Rotating Cube
-     * 1. update vertex shader.
-     * - add 3 matrices to transform the vertPosition
-     * - in OpenGL, transformation applies in reverse order
-     *    m1 * m2 * m3 * vert
-     *    means: vert * m3 first, then * with m2, and then * with m1 - in this order
-     *
-     * 2. update vertPosition type from vec2 to vec3
-     * 3. in `vertices` arrays, add the Z position to each vertex
-     * 4. update vertex attribute pointer position in `vertexAttribPointer` - now it's 3 (X,Y,Z) instead of 2 (X,Y)
-     *
-     * at this point, it doesn't draw anything yet because by default, all matices in the vertex shader is 0
-     * and thus it doesn't draw.
-     * we have to pass in matrices to the vertex shader from our main program.
-     *
-     * */
-
-    // target locations of those uniforms in the vertex shader
-    const matWorldUniformLocation = this.gl.getUniformLocation(
-      program,
-      'mWorld'
-    );
-    const matViewUniformLocation = this.gl.getUniformLocation(program, 'mView');
-    const matProjUniformLocation = this.gl.getUniformLocation(program, 'mProj');
-
-    // create an empty matrix for each
-    // then convert each matrix to an Identity matrix using glMatrix
-    // note: mat4.identity expects a parameter with type `mat4` instead of `Float32Array`
-
-    // const worldMatrix = new Float32Array(16);
-    // const viewMatrix = new Float32Array(16);
-    // const projMatrix = new Float32Array(16);
-    // mat4.identity(<mat4>worldMatrix);
-    // mat4.identity(<mat4>viewMatrix);
-    // mat4.identity(<mat4>projMatrix);
-
-    // this does the same - create 3 identity matrices!
-    // const worldMatrix = mat4.create();
-    // const viewMatrix = mat4.create();
-    // const projMatrix = mat4.create();
-
-    // set positions in 3d space
-    const viewMatrix = new Float32Array(16);
-    const eyePosition = [0, 300, -600];
-    const centerPosition = [0, 0, 0];
-    const upPosition = [0, 1, 0];
-    mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
-
-    // projection matrix: control how the 3D space is projected in to 2D
-    const projMatrix = new Float32Array(16);
-    const verticalFieldOfView = glMatrix.toRadian(45); // 45 degree in vertical
-    const aspectRatio = this.canvasWidth / this.canvasHeight;
-    const near = 0.1;
-    const far = 1000;
-    mat4.perspective(
-      <mat4>projMatrix,
-      verticalFieldOfView,
-      aspectRatio,
-      near,
-      far
-    );
-
-    // const worldMatrix = new Float32Array(16);
-    const worldMatrix = mat4.create();
-    const xRotationMatrix = new Float32Array(16);
-    const yRotationMatrix = new Float32Array(16);
-    const translationMatrix = new Float32Array(16);
-
-    // pass on matices to the shaders
-    // "uniform matrix with 4 points, floats, and whatever v is"
-    this.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
-    this.gl.uniformMatrix4fv(matViewUniformLocation, false, viewMatrix);
-    this.gl.uniformMatrix4fv(matProjUniformLocation, false, projMatrix);
-
-    // main render loop - make things animate!
-    // update worldMatrix every frame
-    let angle = 0;
-    const identityMatrix = mat4.create();
-    const xyAxis = [1, 0.5, 0.5];
-    const yAxis = [0, 1, 0];
-    const intervalInSeconds = 10;
-
-    function render() {
-      this.resize(this.gl.canvas);
-      // performance.now() returns relative time in ms since page loads
-      // ` / 1000` to convert from ms to seconds
-      // ` / 6` to get value of angle to increase per each frame
-      // result = 1 full rotation every 6 seconds
-      angle = (performance.now() / 1000 / intervalInSeconds) * 2 * Math.PI;
-
-      // rotate the worldMatrix, by identityMatrix, by `angle` each time, around `yAxis`
-      // mat4.rotate(<mat4>xRotationMatrix, identityMatrix, angle * 0.1, xAxis);
-
-      // create 2 rotation matrices for each axis
-      mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, [0, 1, 0]);
-      mat4.rotate(<mat4>worldMatrix, worldMatrix, angle * 0.1, [0, 0, 1]);
-      // mat4.multiply(worldMatrix, worldMatrix, <mat4>xRotationMatrix);
-
-      // mat4.translate(worldMatrix, worldMatrix, [5, 0, 0]);
-
-      // send the updated worldMatrix to the GPU
-      this.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
-
-      this.clearScreen();
-      // this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
-
-      this.gl.bindTexture(this.gl.TEXTURE_2D, wallTexture);
-      this.gl.activeTexture(this.gl.TEXTURE0);
-
-      // part 2.5 - instead of using `drawArrays`, we use `drawElements`
-      // from the index array with `UNSIGNED_SHORT` data type
-      this.gl.drawElements(
-        this.gl.TRIANGLES,
-        platformIndices.length,
-        this.gl.UNSIGNED_SHORT,
-        0
-      );
-
-      requestAnimationFrame(render.bind(this));
-    }
-
-    requestAnimationFrame(render.bind(this));
-
-    // -----
-
-    /**
-     * Part 2.5
-     *
-     * in order to create a cube from triangles, we have to create 2 vertexes
-     * for each face on the cube: 2 triangles combined into 1 rectangle.
-     * the cube has 6 faces will end up with 12 vertexes
-     * that's 12 * 6 = 72 points to define in the `vertices` array!
-     * and there will be many duplicated points in the array
-     * as each corner of the cube shares the same coordinates.
-
-     * so we will instead create only 4 points instead of 6 points in a vertex
-     * and introduce another array of `indexes` to tell webgl
-     * which points to use to create each face of the cube.
-     *
-     * @see `boxVertices` and `boxIndices` below `vertices` array declaration
-     * as well as the updated `render` function.
-     *
-     * at this point, the cube is draw and it is rotating, but doesn't look quite correct yet.
-     * the green face always is on the top of everything
-     * because we didn't do the "depth test" of each face before drawing it.
-     *
-     * gl.enable(gl.DEPTH_TEST);
-     *
-     * we should also enable CULL_FACE to prevent opengl to do calculations
-     * for faces that are not visible to the user - faces in the back
-     *
-     * gl.enable(gl.CULL_FACE);
-     */
-
-    /**
-     * Part 3 - Rotating the Cube in multiple axis
-     *
-     * to rotate an object in multiple axis, we will need to create 1 rotation matrix
-     * for each direction to rotate, and multiply them together
-     */
-
-    /**
-     * Part 4 - Texture!!
-     *
-     * 1. add a texture image in the page via <img> tag. set its width and height to 0 to hide it
-     * 2. remove `vertColor` in vertex shader. we will be using texture coordinates instead.
-     *    - we will also be passing texture coords to the fragment shader (from vec3 to vec2)
-     *    - instead of using fragColor values in the fragment shader, we will use 'sampler' - sampling the image
-     * 3. update attribute pointers: use the new `vertTexCoord` instead of the color attribute
-     * 4. update `boxVertices` array - replace RGB values with UV for textures
-     * 5. create texture
-     */
-
-    /**
-     * Part 5: Loading 3D model!
-     *
-     * 1. download a free 3D model
-     * 2. convert to JSON using assimp2json http://www.greentoken.de/onlineconv/
-     * 3. load the JSON via fetch
-     */
+    return program;
   }
 
-  clearScreen() {
-    this.gl.clearColor(0.75, 0.85, 0.8, 1);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-  }
+  private createBuffers(
+    gl: WebGLRenderingContext,
+    program: WebGLProgram,
+    object: any
+  ): any {
+    const { vertices, normals } = object;
+    const indices = [].concat(...object.faces);
+    const texCoords = object.texturecoords[0];
 
-  loadTexture(src: string) {
-    const wallTexture = this.gl.createTexture();
-    this.gl.bindTexture(this.gl.TEXTURE_2D, wallTexture);
+    const vertexBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBufferObject);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
-    // source: mdn
-    // the image can take some time to load over the network
-    // while it is downloading, we fill the texture with gray pixels
-    const level = 0;
-    const internalFormat = this.gl.RGBA;
-    const srcFormat = this.gl.RGBA;
-    const width = 1;
-    const height = 1;
-    const border = 0;
-    const pixel = new Uint8Array([128, 128, 128, 255]);
+    const texCoordsBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordsBufferObject);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texCoords), gl.STATIC_DRAW);
 
-    this.gl.texImage2D(
-      this.gl.TEXTURE_2D,
-      level,
-      internalFormat,
-      width,
-      height,
-      border,
-      srcFormat,
-      this.gl.UNSIGNED_BYTE,
-      pixel
+    const indexBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBufferObject);
+    gl.bufferData(
+      gl.ELEMENT_ARRAY_BUFFER,
+      new Uint16Array(indices),
+      gl.STATIC_DRAW
     );
 
-    // once the image is loaded, we bind the texture again with the image itself
-    const image = new Image();
-    image.onload = () => {
-      this.gl.bindTexture(this.gl.TEXTURE_2D, wallTexture);
-      this.gl.texImage2D(
-        this.gl.TEXTURE_2D,
-        level,
-        internalFormat,
-        srcFormat,
-        this.gl.UNSIGNED_BYTE,
-        image
-      );
+    const normalBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBufferObject);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
 
-      // opengl uses `S` and `T` instead of `U` and `V` respectively
-      this.gl.texParameteri(
-        this.gl.TEXTURE_2D,
-        this.gl.TEXTURE_WRAP_S,
-        this.gl.CLAMP_TO_EDGE
-      );
-      this.gl.texParameteri(
-        this.gl.TEXTURE_2D,
-        this.gl.TEXTURE_WRAP_T,
-        this.gl.CLAMP_TO_EDGE
-      );
-
-      // sampling
-      this.gl.texParameteri(
-        this.gl.TEXTURE_2D,
-        this.gl.TEXTURE_MIN_FILTER,
-        this.gl.LINEAR
-      );
-      this.gl.texParameteri(
-        this.gl.TEXTURE_2D,
-        this.gl.TEXTURE_MAG_FILTER,
-        this.gl.LINEAR
-      );
+    return {
+      vertex: {
+        buffer: vertexBufferObject,
+        numElements: vertices.length
+      },
+      texCoords: {
+        buffer: texCoordsBufferObject,
+        numElements: texCoords.length
+      },
+      index: {
+        buffer: indexBufferObject,
+        numElements: indices.length
+      },
+      normal: {
+        buffer: normalBufferObject,
+        numElements: normals.length
+      }
     };
-    // image.src = src;
-
-    // unbind the texture to save up some memory
-    // this.gl.bindTexture(this.gl.TEXTURE_2D, null);
-
-    return wallTexture;
   }
 
   private drawPlatform(platform: any, program: WebGLProgram) {
@@ -677,14 +379,14 @@ export class App {
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carVertexBufferObject);
     // prettier-ignore
     this.gl.vertexAttribPointer(
-			positionAttributeLocation, // position of the attribute we found just above
-			3, // number of elements (floats) per attribute
-			this.gl.FLOAT, // type of elements
-			false, // dont normalize - note: there is no gl.FALSE
+      positionAttributeLocation, // position of the attribute we found just above
+      3, // number of elements (floats) per attribute
+      this.gl.FLOAT, // type of elements
+      false, // dont normalize - note: there is no gl.FALSE
       // 6 * Float32Array.BYTES_PER_ELEMENT, // size of an individual vertex
       3 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
-			0 // offset from the beginning of a single vertex to this attribute
-		);
+      0 // offset from the beginning of a single vertex to this attribute
+    );
     this.gl.enableVertexAttribArray(positionAttributeLocation);
 
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, carTexCoordsBufferObject);
@@ -719,6 +421,68 @@ export class App {
     this.gl.enableVertexAttribArray(normalAttributeLocation);
   }
 
+  private setupLighting(gl: WebGLRenderingContext, program: WebGLProgram) {
+    // lighting
+    const ambientLightUniformLocation = gl.getUniformLocation(
+      program,
+      'ambientLightIntensity'
+    );
+    const sunlightIntUniformLocation = gl.getUniformLocation(
+      program,
+      'sunlightIntensity'
+    );
+    const sunlightDirUniformLocation = gl.getUniformLocation(
+      program,
+      'sunlightDirection'
+    );
+
+    gl.uniform3f(ambientLightUniformLocation, 0.2, 0.2, 0.2);
+    gl.uniform3f(sunlightIntUniformLocation, 1.0, 1.0, 1.0);
+    gl.uniform3f(sunlightDirUniformLocation, -5.0, 3.0, 0.0);
+  }
+
+  private setCamera(gl: WebGLRenderingContext, program: WebGLProgram) {
+    // target locations of those uniforms in the vertex shader
+    const matWorldUniformLocation = gl.getUniformLocation(program, 'mWorld');
+    const matViewUniformLocation = gl.getUniformLocation(program, 'mView');
+    const matProjUniformLocation = gl.getUniformLocation(program, 'mProj');
+
+    // set positions in 3d space
+    const viewMatrix = new Float32Array(16);
+    const eyePosition = [0, 400, -600];
+    const centerPosition = [0, 0, 0];
+    const upPosition = [0, 1, 0];
+    mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
+
+    // projection matrix: control how the 3D space is projected in to 2D
+    const projMatrix = new Float32Array(16);
+    const verticalFieldOfView = glMatrix.toRadian(45); // 45 degree in vertical
+    const aspectRatio = this.canvasWidth / this.canvasHeight;
+    const near = 0.1;
+    const far = 1000;
+    mat4.perspective(
+      <mat4>projMatrix,
+      verticalFieldOfView,
+      aspectRatio,
+      near,
+      far
+    );
+
+    // const worldMatrix = new Float32Array(16);
+    const worldMatrix = mat4.create();
+
+    // pass on matices to the shaders
+    // "uniform matrix with 4 points, floats, and whatever v is"
+    gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
+    gl.uniformMatrix4fv(matViewUniformLocation, false, viewMatrix);
+    gl.uniformMatrix4fv(matProjUniformLocation, false, projMatrix);
+
+    return {
+      worldMatrix,
+      matWorldUniformLocation
+    };
+  }
+
   private resize(canvas: HTMLCanvasElement) {
     const displayWidth = canvas.clientWidth;
     const displayHeight = canvas.clientHeight;
@@ -729,5 +493,82 @@ export class App {
     }
 
     this.gl.viewport(0, 0, this.canvasWidth, this.canvasHeight);
+  }
+
+  private drawVertex(
+    gl: WebGLRenderingContext,
+    program: WebGLProgram,
+    buffer: WebGLBuffer
+  ) {
+    const positionAttributeLocation = gl.getAttribLocation(
+      program,
+      'vertPosition'
+    );
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    // prettier-ignore
+    gl.vertexAttribPointer(
+          positionAttributeLocation, // position of the attribute we found just above
+          3, // number of elements (floats) per attribute
+          gl.FLOAT, // type of elements
+          false, // dont normalize
+          0,
+          0 // offset from the beginning of a single vertex to this attribute
+        );
+    gl.enableVertexAttribArray(positionAttributeLocation);
+  }
+
+  private drawColor(
+    gl: WebGLRenderingContext,
+    program: WebGLProgram,
+    color: number[]
+  ) {
+    const colorAttributeLocation = this.gl.getUniformLocation(
+      program,
+      'fragColor'
+    );
+    const [x, y, z, w] = color;
+    gl.uniform4f(colorAttributeLocation, x, y, z, w);
+  }
+
+  // private drawTexture(
+  //   gl: WebGLRenderingContext,
+  //   program: WebGLProgram,
+  //   buffer: WebGLBuffer
+  // ) {
+  //   const textureAttributeLocation = gl.getAttribLocation(
+  //     program,
+  //     'vertTexCoord'
+  //   );
+  //   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  //   // prettier-ignore
+  //   gl.vertexAttribPointer(
+  //         textureAttributeLocation,
+  //         2, // u and v in texture coords
+  //         gl.FLOAT, // we still use floats here
+  //         false, // nope
+  //         2 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
+  //         0
+  //       );
+  //   gl.enableVertexAttribArray(textureAttributeLocation);
+  // }
+
+  private drawNormals(
+    gl: WebGLRenderingContext,
+    program: WebGLProgram,
+    buffer: WebGLBuffer
+  ) {
+    // for the normals
+    const normalAttributeLocation = gl.getAttribLocation(program, 'vertNormal');
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.vertexAttribPointer(
+      normalAttributeLocation,
+      3,
+      gl.FLOAT,
+      true, // for normals, we need to set `normalized` param to TRUE
+      3 * Float32Array.BYTES_PER_ELEMENT,
+      0
+    );
+    gl.enableVertexAttribArray(normalAttributeLocation);
   }
 }

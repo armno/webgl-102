@@ -1,7 +1,6 @@
 # webgl-102
 
-Learning WebGL with [WebGL Tutorials by Indigo Code](https://www.youtube.com/watch?v=kB0ZVUrI4Aw&list=PLjcVFFANLS5zH_PeKC6I8p0Pt1hzph_rt) on Youtube (highly recommended. really good!)
-in combination with [Getting Started with WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Getting_started_with_WebGL) tutorials on MDN.
+Notes taken while I learn WebGL.
 
 ## Branches
 
