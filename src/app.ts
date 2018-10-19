@@ -35,9 +35,9 @@ export class App {
     const meshes = model.meshes;
     const objectsToDraw = meshes.map((object: any, i: number) => {
       const objectBuffers = this.createBuffers(this.gl, program, object);
-      const objectTexture = this.createTexture(i);
+      const color = this.setColor(i);
       return {
-        texture: objectTexture,
+        color,
         ...objectBuffers
       };
     });
@@ -81,13 +81,11 @@ export class App {
       this.clearScreen();
 
       objectsToDraw.forEach((object: any) => {
-        this.gl.bindTexture(this.gl.TEXTURE_2D, object.texture);
-
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, object.index.buffer);
 
         this.drawVertex(this.gl, program, object.vertex.buffer);
-        this.drawTexture(this.gl, program, object.texCoords.buffer);
         this.drawNormals(this.gl, program, object.normal.buffer);
+        this.drawColor(this.gl, program, object.color);
 
         this.gl.drawElements(
           this.gl.TRIANGLES,
@@ -108,64 +106,33 @@ export class App {
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
   }
 
-  private createTexture(i: number): WebGLTexture {
-    let objectTexture: WebGLTexture;
+  private setColor(i: number): number[] {
     if (i === 5) {
       // window
-      objectTexture = this.createTextureFromColor([66, 140, 224, 200]);
-    } else if (
-      i === 1 ||
-      i === 2 ||
-      i === 9 ||
-      i === 10 ||
-      i === 12 ||
-      i === 13
-    ) {
-      objectTexture = this.createTextureFromColor([0, 0, 0, 255]);
-    } else if (i === 3) {
-      // stripes
-      objectTexture = this.createTextureFromColor([255, 255, 255, 255]);
-    } else if (i === 6 || i === 7) {
-      // lights
-      objectTexture = this.createTextureFromColor([255, 230, 104, 255]);
-    } else if (i === 14) {
-      // platform
-      objectTexture = this.createTextureFromColor([180, 180, 180, 255]);
-    } else {
-      // base color - red
-      objectTexture = this.createTextureFromColor([180, 10, 10, 255]);
+      return [66, 140, 224, 200];
     }
-    return objectTexture;
-  }
 
-  private createTextureFromColor(color: number[]): WebGLTexture {
-    const texture = this.gl.createTexture();
-    this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+    if (i === 1 || i === 2 || i === 9 || i === 10 || i === 12 || i === 13) {
+      return [0, 0, 0, 255];
+    }
 
-    // source: mdn
-    // the image can take some time to load over the network
-    // while it is downloading, we fill the texture with gray pixels
-    const level = 0;
-    const internalFormat = this.gl.RGBA;
-    const srcFormat = this.gl.RGBA;
-    const width = 1;
-    const height = 1;
-    const border = 0;
-    const pixel = new Uint8Array(color);
+    if (i === 3) {
+      // stripes
+      return [255, 255, 255, 255];
+    }
 
-    this.gl.texImage2D(
-      this.gl.TEXTURE_2D,
-      level,
-      internalFormat,
-      width,
-      height,
-      border,
-      srcFormat,
-      this.gl.UNSIGNED_BYTE,
-      pixel
-    );
+    if (i === 6 || i === 7) {
+      // lights
+      return [255, 230, 104, 255];
+    }
 
-    return texture;
+    if (i === 14) {
+      // platform
+      return [180, 180, 180, 255];
+    }
+
+    // base color - red
+    return [180, 10, 10, 255];
   }
 
   private createShaders(
@@ -207,13 +174,13 @@ export class App {
     varying vec3 fragNormal;
 
     uniform sampler2D sampler;
+    uniform vec4 fragColor;
 
 		void main() {
 
       vec3 surfaceNormal = normalize(fragNormal);
       vec3 sunDirNormal = normalize(sunlightDirection);
-
-      vec4 texel = texture2D(sampler, fragTexCoord);
+      vec4 texel = fragColor / 255.0;
 
       vec3 lightIntensity = ambientLightIntensity + sunlightIntensity * max(dot(fragNormal, sunDirNormal), 0.0);
 
@@ -482,7 +449,7 @@ export class App {
 
     // set positions in 3d space
     const viewMatrix = new Float32Array(16);
-    const eyePosition = [0, 200, -600];
+    const eyePosition = [0, 400, -600];
     const centerPosition = [0, 0, 0];
     const upPosition = [0, 1, 0];
     mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
@@ -551,27 +518,40 @@ export class App {
     gl.enableVertexAttribArray(positionAttributeLocation);
   }
 
-  private drawTexture(
+  private drawColor(
     gl: WebGLRenderingContext,
     program: WebGLProgram,
-    buffer: WebGLBuffer
+    color: number[]
   ) {
-    const textureAttributeLocation = gl.getAttribLocation(
+    const colorAttributeLocation = this.gl.getUniformLocation(
       program,
-      'vertTexCoord'
+      'fragColor'
     );
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    // prettier-ignore
-    gl.vertexAttribPointer(
-          textureAttributeLocation,
-          2, // u and v in texture coords
-          gl.FLOAT, // we still use floats here
-          false, // nope
-          2 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
-          0
-        );
-    gl.enableVertexAttribArray(textureAttributeLocation);
+    const [x, y, z, w] = color;
+    gl.uniform4f(colorAttributeLocation, x, y, z, w);
   }
+
+  // private drawTexture(
+  //   gl: WebGLRenderingContext,
+  //   program: WebGLProgram,
+  //   buffer: WebGLBuffer
+  // ) {
+  //   const textureAttributeLocation = gl.getAttribLocation(
+  //     program,
+  //     'vertTexCoord'
+  //   );
+  //   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  //   // prettier-ignore
+  //   gl.vertexAttribPointer(
+  //         textureAttributeLocation,
+  //         2, // u and v in texture coords
+  //         gl.FLOAT, // we still use floats here
+  //         false, // nope
+  //         2 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
+  //         0
+  //       );
+  //   gl.enableVertexAttribArray(textureAttributeLocation);
+  // }
 
   private drawNormals(
     gl: WebGLRenderingContext,
