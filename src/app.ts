@@ -25,18 +25,17 @@ export class App {
     this.canvasWidth = canvas.clientWidth;
     fetch('./car.json')
       .then(response => response.json())
-      .then(model => {
-        this.draw(model);
-      });
+      .then(model => this.draw(model));
   }
 
   private draw(model: any) {
     const { vertexShader, fragmentShader } = this.createShaders(this.gl);
     const program = this.createProgram(this.gl, vertexShader, fragmentShader);
 
-    const objectsToDraw = [...model.meshes].map((object, i) => {
+    const meshes = model.meshes;
+    const objectsToDraw = meshes.map((object: any, i: number) => {
       const objectBuffers = this.createBuffers(this.gl, program, object);
-      let objectTexture = this.createTexture(i);
+      const objectTexture = this.createTexture(i);
       return {
         texture: objectTexture,
         ...objectBuffers
@@ -50,65 +49,13 @@ export class App {
 
     this.gl.useProgram(program);
 
-    // Create texture
-    // const wallTexture = this.loadTexture('wall.png');
-    const redTexture = this.createTextureFromColor([200, 50, 0, 255]);
-
     // lighting
-    const ambientLightUniformLocation = this.gl.getUniformLocation(
-      program,
-      'ambientLightIntensity'
+    this.setupLighting(this.gl, program);
+
+    const { worldMatrix, matWorldUniformLocation } = this.setCamera(
+      this.gl,
+      program
     );
-    const sunlightIntUniformLocation = this.gl.getUniformLocation(
-      program,
-      'sunlightIntensity'
-    );
-    const sunlightDirUniformLocation = this.gl.getUniformLocation(
-      program,
-      'sunlightDirection'
-    );
-    this.gl.uniform3f(ambientLightUniformLocation, 0.2, 0.2, 0.2);
-    this.gl.uniform3f(sunlightIntUniformLocation, 1.0, 1.0, 1.0);
-    this.gl.uniform3f(sunlightDirUniformLocation, -5.0, 3.0, 0.0);
-
-    // target locations of those uniforms in the vertex shader
-    const matWorldUniformLocation = this.gl.getUniformLocation(
-      program,
-      'mWorld'
-    );
-    const matViewUniformLocation = this.gl.getUniformLocation(program, 'mView');
-    const matProjUniformLocation = this.gl.getUniformLocation(program, 'mProj');
-
-    // set positions in 3d space
-    const viewMatrix = new Float32Array(16);
-    const eyePosition = [0, 200, -600];
-    const centerPosition = [0, 0, 0];
-    const upPosition = [0, 1, 0];
-    mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
-
-    // projection matrix: control how the 3D space is projected in to 2D
-    const projMatrix = new Float32Array(16);
-    const verticalFieldOfView = glMatrix.toRadian(45); // 45 degree in vertical
-    const aspectRatio = this.canvasWidth / this.canvasHeight;
-    const near = 0.1;
-    const far = 1000;
-    mat4.perspective(
-      <mat4>projMatrix,
-      verticalFieldOfView,
-      aspectRatio,
-      near,
-      far
-    );
-
-    // const worldMatrix = new Float32Array(16);
-    const worldMatrix = mat4.create();
-
-    // pass on matices to the shaders
-    // "uniform matrix with 4 points, floats, and whatever v is"
-    this.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
-    this.gl.uniformMatrix4fv(matViewUniformLocation, false, viewMatrix);
-    this.gl.uniformMatrix4fv(matProjUniformLocation, false, projMatrix);
-
     // main render loop - make things animate!
     // update worldMatrix every frame
     let angle = 0;
@@ -123,76 +70,24 @@ export class App {
       // result = 1 full rotation every 6 seconds
       angle = (performance.now() / 1000 / intervalInSeconds) * 2 * Math.PI;
 
-      // rotate the worldMatrix, by identityMatrix, by `angle` each time, around `yAxis`
-      // mat4.rotate(<mat4>xRotationMatrix, identityMatrix, angle * 0.1, xAxis);
-
       // create 2 rotation matrices for each axis
       mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, [0, 1, 0]);
       // mat4.rotate(<mat4>worldMatrix, worldMatrix, angle * 0.1, [0, 0, 1]);
       // mat4.multiply(worldMatrix, worldMatrix, <mat4>xRotationMatrix);
-
-      // mat4.translate(worldMatrix, worldMatrix, [5, 0, 0]);
 
       // send the updated worldMatrix to the GPU
       this.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
 
       this.clearScreen();
 
-      // this.gl.bindTexture(this.gl.TEXTURE_2D, redTexture);
-      // this.gl.activeTexture(this.gl.TEXTURE0);
-
-      objectsToDraw.forEach((object: any, index: number) => {
+      objectsToDraw.forEach((object: any) => {
         this.gl.bindTexture(this.gl.TEXTURE_2D, object.texture);
+
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, object.index.buffer);
 
-        const positionAttributeLocation = this.gl.getAttribLocation(
-          program,
-          'vertPosition'
-        );
-
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, object.vertex.buffer);
-        // prettier-ignore
-        this.gl.vertexAttribPointer(
-          positionAttributeLocation, // position of the attribute we found just above
-          3, // number of elements (floats) per attribute
-          this.gl.FLOAT, // type of elements
-          false, // dont normalize
-          0,
-          0 // offset from the beginning of a single vertex to this attribute
-        );
-        this.gl.enableVertexAttribArray(positionAttributeLocation);
-
-        const textureAttributeLocation = this.gl.getAttribLocation(
-          program,
-          'vertTexCoord'
-        );
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, object.texCoords.buffer);
-        // prettier-ignore
-        this.gl.vertexAttribPointer(
-          textureAttributeLocation,
-          2, // u and v in texture coords
-          this.gl.FLOAT, // we still use floats here
-          false, // nope
-          2 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
-          0
-        );
-        this.gl.enableVertexAttribArray(textureAttributeLocation);
-
-        // for the normals
-        const normalAttributeLocation = this.gl.getAttribLocation(
-          program,
-          'vertNormal'
-        );
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, object.normal.buffer);
-        this.gl.vertexAttribPointer(
-          normalAttributeLocation,
-          3,
-          this.gl.FLOAT,
-          true,
-          3 * Float32Array.BYTES_PER_ELEMENT,
-          0
-        );
-        this.gl.enableVertexAttribArray(normalAttributeLocation);
+        this.drawVertex(this.gl, program, object.vertex.buffer);
+        this.drawTexture(this.gl, program, object.texCoords.buffer);
+        this.drawNormals(this.gl, program, object.normal.buffer);
 
         this.gl.drawElements(
           this.gl.TRIANGLES,
@@ -216,7 +111,8 @@ export class App {
   private createTexture(i: number): WebGLTexture {
     let objectTexture: WebGLTexture;
     if (i === 5) {
-      objectTexture = this.createTextureFromColor([66, 140, 224, 255]);
+      // window
+      objectTexture = this.createTextureFromColor([66, 140, 224, 200]);
     } else if (
       i === 1 ||
       i === 2 ||
@@ -227,7 +123,7 @@ export class App {
     ) {
       objectTexture = this.createTextureFromColor([0, 0, 0, 255]);
     } else if (i === 3) {
-      // strips
+      // stripes
       objectTexture = this.createTextureFromColor([255, 255, 255, 255]);
     } else if (i === 6 || i === 7) {
       // lights
@@ -369,9 +265,6 @@ export class App {
     fragmentShader: WebGLShader
   ): WebGLProgram {
     const program: WebGLProgram = gl.createProgram();
-
-    // combine 2 shaders: tell opengl to use these shaders in a "program"
-    // create new webgl "program"
 
     // then attach compiled shaders to the program
     this.gl.attachShader(program, vertexShader);
@@ -561,6 +454,68 @@ export class App {
     this.gl.enableVertexAttribArray(normalAttributeLocation);
   }
 
+  private setupLighting(gl: WebGLRenderingContext, program: WebGLProgram) {
+    // lighting
+    const ambientLightUniformLocation = gl.getUniformLocation(
+      program,
+      'ambientLightIntensity'
+    );
+    const sunlightIntUniformLocation = gl.getUniformLocation(
+      program,
+      'sunlightIntensity'
+    );
+    const sunlightDirUniformLocation = gl.getUniformLocation(
+      program,
+      'sunlightDirection'
+    );
+
+    gl.uniform3f(ambientLightUniformLocation, 0.2, 0.2, 0.2);
+    gl.uniform3f(sunlightIntUniformLocation, 1.0, 1.0, 1.0);
+    gl.uniform3f(sunlightDirUniformLocation, -5.0, 3.0, 0.0);
+  }
+
+  private setCamera(gl: WebGLRenderingContext, program: WebGLProgram) {
+    // target locations of those uniforms in the vertex shader
+    const matWorldUniformLocation = gl.getUniformLocation(program, 'mWorld');
+    const matViewUniformLocation = gl.getUniformLocation(program, 'mView');
+    const matProjUniformLocation = gl.getUniformLocation(program, 'mProj');
+
+    // set positions in 3d space
+    const viewMatrix = new Float32Array(16);
+    const eyePosition = [0, 200, -600];
+    const centerPosition = [0, 0, 0];
+    const upPosition = [0, 1, 0];
+    mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
+
+    // projection matrix: control how the 3D space is projected in to 2D
+    const projMatrix = new Float32Array(16);
+    const verticalFieldOfView = glMatrix.toRadian(45); // 45 degree in vertical
+    const aspectRatio = this.canvasWidth / this.canvasHeight;
+    const near = 0.1;
+    const far = 1000;
+    mat4.perspective(
+      <mat4>projMatrix,
+      verticalFieldOfView,
+      aspectRatio,
+      near,
+      far
+    );
+
+    // const worldMatrix = new Float32Array(16);
+    const worldMatrix = mat4.create();
+
+    // pass on matices to the shaders
+    // "uniform matrix with 4 points, floats, and whatever v is"
+    gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
+    gl.uniformMatrix4fv(matViewUniformLocation, false, viewMatrix);
+    gl.uniformMatrix4fv(matProjUniformLocation, false, projMatrix);
+
+    return {
+      worldMatrix,
+      matWorldUniformLocation
+    };
+  }
+
   private resize(canvas: HTMLCanvasElement) {
     const displayWidth = canvas.clientWidth;
     const displayHeight = canvas.clientHeight;
@@ -571,5 +526,69 @@ export class App {
     }
 
     this.gl.viewport(0, 0, this.canvasWidth, this.canvasHeight);
+  }
+
+  private drawVertex(
+    gl: WebGLRenderingContext,
+    program: WebGLProgram,
+    buffer: WebGLBuffer
+  ) {
+    const positionAttributeLocation = gl.getAttribLocation(
+      program,
+      'vertPosition'
+    );
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    // prettier-ignore
+    gl.vertexAttribPointer(
+          positionAttributeLocation, // position of the attribute we found just above
+          3, // number of elements (floats) per attribute
+          gl.FLOAT, // type of elements
+          false, // dont normalize
+          0,
+          0 // offset from the beginning of a single vertex to this attribute
+        );
+    gl.enableVertexAttribArray(positionAttributeLocation);
+  }
+
+  private drawTexture(
+    gl: WebGLRenderingContext,
+    program: WebGLProgram,
+    buffer: WebGLBuffer
+  ) {
+    const textureAttributeLocation = gl.getAttribLocation(
+      program,
+      'vertTexCoord'
+    );
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    // prettier-ignore
+    gl.vertexAttribPointer(
+          textureAttributeLocation,
+          2, // u and v in texture coords
+          gl.FLOAT, // we still use floats here
+          false, // nope
+          2 * Float32Array.BYTES_PER_ELEMENT, // changed to 5 in Texture chapter
+          0
+        );
+    gl.enableVertexAttribArray(textureAttributeLocation);
+  }
+
+  private drawNormals(
+    gl: WebGLRenderingContext,
+    program: WebGLProgram,
+    buffer: WebGLBuffer
+  ) {
+    // for the normals
+    const normalAttributeLocation = gl.getAttribLocation(program, 'vertNormal');
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.vertexAttribPointer(
+      normalAttributeLocation,
+      3,
+      gl.FLOAT,
+      true, // for normals, we need to set `normalized` param to TRUE
+      3 * Float32Array.BYTES_PER_ELEMENT,
+      0
+    );
+    gl.enableVertexAttribArray(normalAttributeLocation);
   }
 }
