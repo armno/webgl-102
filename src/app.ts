@@ -4,6 +4,8 @@ export class App {
   private gl: WebGLRenderingContext;
   private canvasWidth: number;
   private canvasHeight: number;
+  private worldMatrix: mat4;
+  private currentXAngle: number = 0;
 
   init() {
     const canvas = <HTMLCanvasElement>document.getElementById('webgl-102');
@@ -27,6 +29,8 @@ export class App {
     fetch('./car.json')
       .then(response => response.json())
       .then((model: RootObject) => this.draw(model));
+
+    this.handleMouseMove();
   }
 
   private draw(model: RootObject) {
@@ -57,6 +61,7 @@ export class App {
       this.gl,
       program
     );
+    this.worldMatrix = worldMatrix;
     // main render loop - make things animate!
     // update worldMatrix every frame
     let angle = 0;
@@ -458,5 +463,27 @@ export class App {
       0
     );
     gl.enableVertexAttribArray(normalAttributeLocation);
+  }
+
+  rotate(event: MouseEvent) {
+    // @TODO: xDistance should be the relative distance, not absolute to the screen
+    // like 'rotate more x radians from the current'
+    const xDistance = event.pageX;
+    const xAngle = glMatrix.toRadian(xDistance * 0.3);
+    const identityMatrix = mat4.create();
+    this.currentXAngle = xAngle;
+    mat4.rotate(this.worldMatrix, identityMatrix, xAngle, [0, 1, 0]);
+  }
+
+  private handleMouseMove() {
+    const onMouseMove = this.rotate.bind(this);
+
+    document.addEventListener('mousedown', () => {
+      document.addEventListener('mousemove', onMouseMove, false);
+    });
+
+    document.addEventListener('mouseup', () => {
+      document.removeEventListener('mousemove', onMouseMove, false);
+    });
   }
 }
