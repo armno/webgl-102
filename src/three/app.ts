@@ -4,7 +4,8 @@ export class App {
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private cube: THREE.Mesh;
-  private car: any;
+
+  private isAnimating = true;
 
   init() {
     this.scene = this.createScene();
@@ -16,6 +17,8 @@ export class App {
 
     this.animate();
     requestAnimationFrame(() => this.animate());
+
+    this.bindEvents();
   }
 
   private createScene(): THREE.Scene {
@@ -61,8 +64,11 @@ export class App {
   }
 
   private animate() {
-    this.cube.rotation.x += 0.01;
-    this.cube.rotation.y += 0.01;
+    if (this.isAnimating) {
+      this.cube.rotation.x += 0.01;
+      this.cube.rotation.y += 0.01;
+    }
+
     this.renderer.render(this.scene, this.camera);
 
     requestAnimationFrame(() => this.animate());
@@ -84,5 +90,19 @@ export class App {
     pointLight.position.setZ(5);
 
     this.scene.add(pointLight);
+  }
+
+  private bindEvents() {
+    document.addEventListener('keyup', (event: KeyboardEvent) => {
+      const key = event.keyCode;
+      const SPACEBAR = 32;
+      if (key === SPACEBAR) {
+        this.toggleRotation();
+      }
+    });
+  }
+
+  private toggleRotation() {
+    this.isAnimating = !this.isAnimating;
   }
 }
