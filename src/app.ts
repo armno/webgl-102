@@ -6,6 +6,7 @@ export class App {
   private canvasHeight: number;
   private worldMatrix: mat4;
   private currentXAngle: number = 0;
+  private origin: number;
 
   init() {
     const canvas = <HTMLCanvasElement>document.getElementById('webgl-102');
@@ -466,19 +467,24 @@ export class App {
   }
 
   rotate(event: MouseEvent) {
-    // @TODO: xDistance should be the relative distance, not absolute to the screen
-    // like 'rotate more x radians from the current'
-    const xDistance = event.pageX;
-    const xAngle = glMatrix.toRadian(xDistance * 0.3);
+    const xDistance = this.origin - event.pageX;
+    // this converts degrees to radians ...1
+    // there should be a better way to convert px to degrees .. a more accurate way
+    const xAngle = glMatrix.toRadian(xDistance) * 0.03;
     const identityMatrix = mat4.create();
-    this.currentXAngle = xAngle;
-    mat4.rotate(this.worldMatrix, identityMatrix, xAngle, [0, 1, 0]);
+    this.currentXAngle = xAngle + this.currentXAngle;
+    mat4.rotate(this.worldMatrix, identityMatrix, this.currentXAngle, [
+      0,
+      1,
+      0
+    ]);
   }
 
   private handleMouseMove() {
     const onMouseMove = this.rotate.bind(this);
 
-    document.addEventListener('mousedown', () => {
+    document.addEventListener('mousedown', event => {
+      this.origin = event.pageX;
       document.addEventListener('mousemove', onMouseMove, false);
     });
 
