@@ -1,7 +1,7 @@
 {
-	"compilerOptions": {
-		"allowJs": true,
-		"target": "es5",
-		"noImplicitAny": true
-	}
+  "compilerOptions": {
+    "allowJs": true,
+    "target": "es6",
+    "noImplicitAny": true
+  }
 }
