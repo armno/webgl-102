@@ -69,10 +69,10 @@ export class App {
       // ` / 1000` to convert from ms to seconds
       // ` / 6` to get value of angle to increase per each frame
       // result = 1 full rotation every 6 seconds
-      angle = (performance.now() / 1000 / intervalInSeconds) * 2 * Math.PI;
+      // angle = (performance.now() / 1000 / intervalInSeconds) * 2 * Math.PI;
 
       // create 2 rotation matrices for each axis
-      mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, [0, 1, 0]);
+      // mat4.rotate(<mat4>worldMatrix, identityMatrix, angle, [0, 1, 0]);
       // mat4.rotate(<mat4>worldMatrix, worldMatrix, angle * 0.1, [0, 0, 1]);
       // mat4.multiply(worldMatrix, worldMatrix, <mat4>xRotationMatrix);
 
@@ -337,7 +337,7 @@ export class App {
 
     // set positions in 3d space
     const viewMatrix = new Float32Array(16);
-    const eyePosition = [0, 400, -600];
+    const eyePosition = [0, 200, -600];
     const centerPosition = [0, 0, 0];
     const upPosition = [0, 1, 0];
     mat4.lookAt(<mat4>viewMatrix, eyePosition, centerPosition, upPosition);
